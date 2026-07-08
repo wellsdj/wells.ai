@@ -48,6 +48,9 @@
 })();
 </script>
 <style id="canvasStylesV2">
+    /* Fable 5 accent for the split-view model dot */
+    .split-model-dot.fable { background: #f0abfc; }
+
     /* ═══ CANVAS V2 — consistent multi-file code panel ═══ */
     .app.canvas-open { grid-template-columns: 270px 1fr 480px; }
 
@@ -188,6 +191,7 @@
                         <div class="spend-model-row"><span class="spend-model-name">Haiku</span><span class="spend-model-val" id="spendHaiku">$0.0000</span></div>
                         <div class="spend-model-row"><span class="spend-model-name">Sonnet</span><span class="spend-model-val" id="spendSonnet">$0.0000</span></div>
                         <div class="spend-model-row"><span class="spend-model-name">Opus</span><span class="spend-model-val" id="spendOpus">$0.0000</span></div>
+                        <div class="spend-model-row"><span class="spend-model-name">Fable</span><span class="spend-model-val" id="spendFable">$0.0000</span></div>
                     </div>
                     <div class="spend-note">Estimate based on token usage. Actual Anthropic charges may differ slightly.</div>
                     <button class="spend-reset-btn" onclick="resetAllTimeSpend()">Reset history</button>
@@ -201,17 +205,15 @@
                 <div class="usage-header" style="cursor:pointer" onclick="toggleUsage()">
                     <button class="usage-toggle-btn" tabindex="-1">
                         <span class="usage-chevron" id="usageChevron">▼</span>
-                        <span class="usage-label" style="margin:0">Daily Usage</span>
+                        <span class="usage-label" style="margin:0">Usage Today</span>
                     </button>
                     <span class="usage-cost" id="usageCost">$0.0000</span>
                 </div>
                 <div class="usage-body" id="usageBody">
-                    <div class="usage-track" style="margin-top:6px"><div class="usage-fill" id="usageFill"></div></div>
-                    <div class="usage-detail">
+                    <div class="usage-detail" style="margin-top:6px">
                         <span id="usageTokens">0 tokens</span>
-                        <span id="usagePct">0% of $0.75</span>
+                        <span id="usagePct">unlimited</span>
                     </div>
-                    <div class="usage-blocked" id="usageBlocked">Daily limit reached. Resets at midnight.</div>
                     <div class="usage-reset" id="usageReset">Resets in —</div>
                 </div>
             </div>
@@ -359,6 +361,7 @@
                 <div class="model-container">
                     <button class="model-btn" id="modelBtn" title="Select Model">⊕</button>
                     <div class="model-menu" id="modelMenu">
+                        <button class="model-opt" data-model="claude-fable-5">Claude Fable 5<span>Most capable — 1M context</span></button>
                         <button class="model-opt" data-model="claude-opus-4-6">Claude Opus 4.6<span>Frontier — logic &amp; 1M context</span></button>
                         <button class="model-opt" data-model="claude-sonnet-4-6">Claude Sonnet 4.6<span>Balanced speed &amp; intelligence</span></button>
                         <button class="model-opt selected" data-model="claude-haiku-4-5-20251001">Claude Haiku 4.5<span>Fast &amp; economical</span></button>
@@ -396,6 +399,7 @@
                             <button class="split-model-opt active" data-model="claude-haiku-4-5-20251001" onclick="setSplitModel('A','claude-haiku-4-5-20251001',event)">Haiku 4.5<span>Fast &amp; economical</span></button>
                             <button class="split-model-opt" data-model="claude-sonnet-4-6" onclick="setSplitModel('A','claude-sonnet-4-6',event)">Sonnet 4.6<span>Balanced</span></button>
                             <button class="split-model-opt" data-model="claude-opus-4-6" onclick="setSplitModel('A','claude-opus-4-6',event)">Opus 4.6<span>Frontier</span></button>
+                            <button class="split-model-opt" data-model="claude-fable-5" onclick="setSplitModel('A','claude-fable-5',event)">Fable 5<span>Most capable</span></button>
                         </div>
                     </div>
                     <button class="split-exit-btn" onclick="exitSplit()">exit split</button>
@@ -423,6 +427,7 @@
                             <button class="split-model-opt" data-model="claude-haiku-4-5-20251001" onclick="setSplitModel('B','claude-haiku-4-5-20251001',event)">Haiku 4.5<span>Fast &amp; economical</span></button>
                             <button class="split-model-opt active" data-model="claude-sonnet-4-6" onclick="setSplitModel('B','claude-sonnet-4-6',event)">Sonnet 4.6<span>Balanced</span></button>
                             <button class="split-model-opt" data-model="claude-opus-4-6" onclick="setSplitModel('B','claude-opus-4-6',event)">Opus 4.6<span>Frontier</span></button>
+                            <button class="split-model-opt" data-model="claude-fable-5" onclick="setSplitModel('B','claude-fable-5',event)">Fable 5<span>Most capable</span></button>
                         </div>
                     </div>
                     <div></div>
@@ -778,7 +783,6 @@ function applyUserToggles(el, userToggles) {
 async function send() {
     stopRequested = false;
     if (isStreaming) return;
-    if (isOverLimit()) { alert('Daily limit of $' + DAILY_LIMIT + ' reached. Resets at midnight.'); return; }
     const input = document.getElementById('userInput');
     const text = input.value.trim();
     if (!text && images.length === 0 && attachedFiles.length === 0) return;
@@ -955,7 +959,7 @@ async function doRoast(target) {
 function loadAllTime() {
     return JSON.parse(localStorage.getItem('wai_alltime') || JSON.stringify({
         totalCost: 0, totalTokens: 0, totalMsgs: 0,
-        days: [], byModel: { haiku: 0, sonnet: 0, opus: 0 }
+        days: [], byModel: { haiku: 0, sonnet: 0, opus: 0, fable: 0 }
     }));
 }
 
@@ -970,7 +974,7 @@ function trackAllTime(inputTokens, outputTokens, mdl, cost) {
     a.totalMsgs += 1;
     const today = new Date().toDateString();
     if (!a.days.includes(today)) a.days.push(today);
-    const key = mdl.includes('opus') ? 'opus' : mdl.includes('sonnet') ? 'sonnet' : 'haiku';
+    const key = mdl.includes('fable') ? 'fable' : mdl.includes('opus') ? 'opus' : mdl.includes('sonnet') ? 'sonnet' : 'haiku';
     a.byModel[key] = (a.byModel[key] || 0) + cost;
     saveAllTime(a);
 }
@@ -984,6 +988,7 @@ function renderSpend() {
     document.getElementById('spendHaiku').textContent = '$' + (a.byModel.haiku || 0).toFixed(4);
     document.getElementById('spendSonnet').textContent = '$' + (a.byModel.sonnet || 0).toFixed(4);
     document.getElementById('spendOpus').textContent = '$' + (a.byModel.opus || 0).toFixed(4);
+    document.getElementById('spendFable').textContent = '$' + (a.byModel.fable || 0).toFixed(4);
 }
 
 function toggleSpend(e) {
@@ -1007,12 +1012,13 @@ document.addEventListener('click', e => {
 // ═══════════════════════════════════════════════════════════
 // USAGE METER
 // ═══════════════════════════════════════════════════════════
-const DAILY_LIMIT = 0.75; // $0.75/day
+// No spending cap — usage is tracked and shown, never blocked.
 const PRICING = {
     // per 1M tokens
     'claude-haiku-4-5-20251001': { input: 0.80,  output: 4.00  },
     'claude-sonnet-4-6':         { input: 3.00,  output: 15.00 },
     'claude-opus-4-6':           { input: 15.00, output: 75.00 },
+    'claude-fable-5':            { input: 10.00, output: 50.00 },
 };
 
 function loadUsage() {
@@ -1041,31 +1047,20 @@ function trackUsage(inputTokens, outputTokens, mdl) {
     renderUsage();
 }
 
-function isOverLimit() {
-    return loadUsage().cost >= DAILY_LIMIT;
-}
-
 function renderUsage() {
     const u = loadUsage();
-    const pct = Math.min((u.cost / DAILY_LIMIT) * 100, 100);
     const totalTokens = (u.inputTokens || 0) + (u.outputTokens || 0);
 
     document.getElementById('usageCost').textContent = '$' + u.cost.toFixed(4);
     document.getElementById('usageTokens').textContent = totalTokens.toLocaleString() + ' tokens';
-    document.getElementById('usagePct').textContent = pct.toFixed(1) + '% of $' + DAILY_LIMIT.toFixed(2);
+    document.getElementById('usagePct').textContent = 'no limit';
 
-    const fill = document.getElementById('usageFill');
-    fill.style.width = pct + '%';
-    fill.className = 'usage-fill' + (pct >= 100 ? ' danger' : pct >= 70 ? ' warn' : '');
-
-    document.getElementById('usageBlocked').classList.toggle('show', pct >= 100);
-
-    // Reset timer
+    // Reset timer — the daily counter still rolls over at midnight
     const now = new Date();
     const midnight = new Date(now); midnight.setHours(24, 0, 0, 0);
     const hoursLeft = Math.floor((midnight - now) / 3600000);
     const minsLeft = Math.floor(((midnight - now) % 3600000) / 60000);
-    document.getElementById('usageReset').textContent = 'Resets in ' + hoursLeft + 'h ' + minsLeft + 'm';
+    document.getElementById('usageReset').textContent = 'Counter resets in ' + hoursLeft + 'h ' + minsLeft + 'm';
 }
 
 // Update reset timer every minute
@@ -1575,11 +1570,13 @@ const splitState = {
 };
 
 function modelShortName(mdl) {
+    if (mdl.includes('fable'))  return 'Fable 5';
     if (mdl.includes('opus'))   return 'Opus 4.6';
     if (mdl.includes('sonnet')) return 'Sonnet 4.6';
     return 'Haiku 4.5';
 }
 function modelDotClass(mdl) {
+    if (mdl.includes('fable'))  return 'fable';
     if (mdl.includes('opus'))   return 'opus';
     if (mdl.includes('sonnet')) return 'sonnet';
     return 'haiku';
