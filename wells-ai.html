@@ -47,6 +47,121 @@
   }
 })();
 </script>
+<style id="canvasStylesV2">
+    /* ═══ CANVAS V2 — consistent multi-file code panel ═══ */
+    .app.canvas-open { grid-template-columns: 270px 1fr 480px; }
+
+    .canvas-panel {
+        display: none; flex-direction: column;
+        background: #0b1120; border: 1px solid var(--glass-border);
+        border-radius: var(--r); overflow: hidden; min-width: 0;
+    }
+    .app.canvas-open .canvas-panel { display: flex; }
+
+    /* Title bar */
+    .canvas-topbar {
+        display: flex; align-items: center; gap: 8px;
+        padding: 9px 12px; border-bottom: 1px solid var(--glass-border);
+        background: #0d1428; flex-shrink: 0;
+    }
+    .canvas-topbar .canvas-title {
+        flex: 1; font-size: 12px; font-family: var(--font-mono);
+        color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0;
+    }
+    .canvas-icon-btn {
+        background: none; border: 1px solid transparent; color: var(--muted);
+        cursor: pointer; font-size: 13px; line-height: 1; padding: 4px 8px;
+        border-radius: 6px; transition: 0.15s; font-family: inherit; white-space: nowrap;
+    }
+    .canvas-icon-btn:hover { background: var(--glass2); color: var(--text); }
+    .canvas-close-btn:hover { color: var(--accent2); background: rgba(220,38,38,0.12); }
+
+    /* File tabs row */
+    .canvas-filetabs {
+        display: flex; align-items: stretch; gap: 2px; flex-shrink: 0;
+        padding: 6px 8px 0; background: #0d1428; overflow-x: auto;
+        border-bottom: 1px solid var(--glass-border); scrollbar-width: thin;
+    }
+    .canvas-filetabs::-webkit-scrollbar { height: 5px; }
+    .canvas-filetabs::-webkit-scrollbar-thumb { background: var(--glass2); border-radius: 3px; }
+    .canvas-filetab {
+        display: flex; align-items: center; gap: 7px; padding: 7px 12px;
+        font-size: 12px; font-family: var(--font-mono); color: var(--muted);
+        background: transparent; border: 1px solid transparent; border-bottom: none;
+        border-radius: 8px 8px 0 0; cursor: pointer; white-space: nowrap;
+        transition: 0.15s; max-width: 200px;
+    }
+    .canvas-filetab:hover:not(.active) { background: rgba(255,255,255,0.04); color: var(--text); }
+    .canvas-filetab.active {
+        background: #0b1120; color: var(--text);
+        border-color: var(--glass-border); border-bottom-color: #0b1120;
+        margin-bottom: -1px;
+    }
+    .canvas-filetab .ft-dot { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+    .canvas-filetab .ft-name { overflow: hidden; text-overflow: ellipsis; }
+
+    /* View toggle (Preview / Code) */
+    .canvas-viewbar {
+        display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+        padding: 8px 12px; background: #0d1428; border-bottom: 1px solid var(--glass-border);
+    }
+    .canvas-viewtab {
+        padding: 5px 14px; border-radius: 7px; font-size: 12px; cursor: pointer;
+        background: none; border: 1px solid transparent; color: var(--muted);
+        font-family: inherit; transition: 0.15s; font-weight: 500;
+    }
+    .canvas-viewtab.active { background: rgba(37,99,235,0.18); border-color: rgba(37,99,235,0.35); color: #93c5fd; }
+    .canvas-viewtab:hover:not(.active):not(:disabled) { background: var(--glass2); color: var(--text); }
+    .canvas-viewtab:disabled { opacity: 0.35; cursor: not-allowed; }
+    .canvas-viewbar .spacer { flex: 1; }
+    .canvas-lang-badge {
+        font-size: 10.5px; font-family: var(--font-mono); color: var(--muted);
+        padding: 3px 8px; border-radius: 5px; background: var(--glass); text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    /* Body */
+    .canvas-body { flex: 1; position: relative; overflow: hidden; background: #0b1120; }
+    .canvas-iframe {
+        width: 100%; height: 100%; border: none; background: #fff; display: none;
+    }
+    .canvas-iframe.active { display: block; }
+
+    /* Code editor view — fixed look regardless of language */
+    .canvas-code-view {
+        position: absolute; inset: 0; overflow: auto; display: none;
+        font-family: var(--font-mono); font-size: 12.5px; line-height: 1.65;
+        background: #0b1120; tab-size: 4;
+    }
+    .canvas-code-view.active { display: block; }
+    .canvas-code-inner { display: flex; min-height: 100%; min-width: min-content; }
+    .code-gutter {
+        flex-shrink: 0; text-align: right; padding: 14px 10px 14px 16px;
+        color: rgba(240,244,255,0.25); user-select: none;
+        background: #0b1120; border-right: 1px solid var(--glass-border); position: sticky; left: 0;
+    }
+    .code-gutter span { display: block; }
+    .canvas-code-view pre {
+        margin: 0; padding: 14px 18px; flex: 1; white-space: pre;
+        color: #c9d5f0; font-family: inherit;
+    }
+    .canvas-placeholder {
+        position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+        flex-direction: column; gap: 10px; color: var(--muted); text-align: center; padding: 30px;
+    }
+    .canvas-placeholder.active { display: flex; }
+    .canvas-placeholder .ph-icon { font-size: 34px; opacity: 0.5; }
+
+    /* Syntax highlighting tokens */
+    .tok-kw   { color: #c792ea; }
+    .tok-str  { color: #c3e88d; }
+    .tok-num  { color: #f78c6c; }
+    .tok-com  { color: #5f7488; font-style: italic; }
+    .tok-fn   { color: #82aaff; }
+    .tok-tag  { color: #f07178; }
+    .tok-attr { color: #ffcb6b; }
+    .tok-punc { color: #89ddff; }
+    .tok-prop { color: #b2ccd6; }
+</style>
 </head>
 <body ondragover="event.preventDefault(); showDrop(true);" ondragleave="checkLeave(event);">
 
@@ -329,22 +444,28 @@
 
     <!-- CANVAS PANEL -->
     <div class="canvas-panel" id="canvasPanel">
-        <div class="canvas-header">
-            <div style="display:flex;gap:4px">
-                <button class="canvas-tab active" id="canvasTabPreview" onclick="canvasTab('preview')">Preview</button>
-                <button class="canvas-tab" id="canvasTabCode" onclick="canvasTab('code')">Code</button>
-            </div>
-            <span class="canvas-title" id="canvasTitle">—</span>
-            <button class="canvas-close" onclick="closeCanvas()" title="Close">✕</button>
+        <div class="canvas-topbar">
+            <span class="canvas-title" id="canvasTitle">Canvas</span>
+            <button class="canvas-icon-btn" onclick="copyCanvasFile()" title="Copy file">⧉ Copy</button>
+            <button class="canvas-icon-btn" onclick="downloadCanvasFile()" title="Download file">⭳ Save</button>
+            <button class="canvas-icon-btn canvas-close-btn" onclick="closeCanvas()" title="Close">✕</button>
         </div>
-        <div class="canvas-toolbar" id="canvasToolbar">
-            <button class="canvas-tab" onclick="reloadCanvas()" style="font-size:11px">↺ Reload</button>
-            <button class="canvas-tab" onclick="openCanvasNewTab()" style="font-size:11px">↗ New tab</button>
+        <div class="canvas-filetabs" id="canvasFileTabs"></div>
+        <div class="canvas-viewbar">
+            <button class="canvas-viewtab" id="canvasTabPreview" onclick="canvasTab('preview')">▷ Preview</button>
+            <button class="canvas-viewtab active" id="canvasTabCode" onclick="canvasTab('code')">‹ › Code</button>
+            <span class="spacer"></span>
+            <button class="canvas-icon-btn" id="canvasReloadBtn" onclick="reloadCanvas()" title="Reload preview">↺</button>
+            <button class="canvas-icon-btn" id="canvasNewTabBtn" onclick="openCanvasNewTab()" title="Open preview in new tab">↗</button>
+            <span class="canvas-lang-badge" id="canvasLangBadge">—</span>
         </div>
         <div class="canvas-body">
-            <iframe class="canvas-iframe active" id="canvasIframe" sandbox="allow-scripts allow-forms allow-modals allow-pointer-lock allow-popups"></iframe>
-            <div class="canvas-code-view" id="canvasCodeView"></div>
-            <div class="canvas-md-view" id="canvasMdView"></div>
+            <iframe class="canvas-iframe" id="canvasIframe" sandbox="allow-scripts allow-forms allow-modals allow-pointer-lock allow-popups"></iframe>
+            <div class="canvas-code-view active" id="canvasCodeView"></div>
+            <div class="canvas-placeholder" id="canvasPlaceholder">
+                <div class="ph-icon">◫</div>
+                <div id="canvasPlaceholderText">No live preview for this language.<br>Showing source in the Code tab.</div>
+            </div>
         </div>
     </div>
 
@@ -477,19 +598,23 @@ function escHtml(t) {
 // ═══════════════════════════════════════════════════════════
 function parseMarkdown(text, freshCounter) {
     if (freshCounter) codeBlockCounter = 0;
-    const parts = text.split(/(```[\w]*\n[\s\S]*?```)/g);
+    const parts = text.split(/(```[^\n]*\n[\s\S]*?```)/g);
     return parts.map(part => {
         if (part.startsWith('```')) {
             const firstNewline = part.indexOf('\n');
-            const lang = part.slice(3, firstNewline).trim() || 'code';
+            const info = part.slice(3, firstNewline).trim();
             const code = part.slice(firstNewline + 1, -3);
             const id = 'cb' + (++codeBlockCounter);
-            const isRunnable = ['html','javascript','js','jsx','svg','markdown','md'].includes(lang.toLowerCase());
-            const canvasBtn = isRunnable ? `<button class="code-run-btn" onclick="openCanvas('${id}')" title="Open in Canvas">◫ Canvas</button>` : '';
-            const newTabBtn = ['html','javascript','js','jsx','svg'].includes(lang.toLowerCase()) ? `<button class="code-run-btn" onclick="runCode('${id}')" title="Run in new tab" style="margin-left:2px">▶ Run</button>` : '';
-            return `<div class="code-block" id="${id}" data-code="${encodeURIComponent(code)}" data-lang="${escHtml(lang)}">
+            const meta = parseFenceInfo(info);            // { lang, filename }
+            const lang = meta.lang;
+            const filename = meta.filename;
+            const isRunnable = isRenderableLang(lang);
+            const canvasBtn = `<button class="code-run-btn" onclick="openCanvas('${id}')" title="Open in Canvas">◫ Canvas</button>`;
+            const newTabBtn = isRunnable ? `<button class="code-run-btn" onclick="runCode('${id}')" title="Run in new tab" style="margin-left:2px">▶ Run</button>` : '';
+            const label = filename || langLabel(lang);
+            return `<div class="code-block" id="${id}" data-code="${encodeURIComponent(code)}" data-lang="${escHtml(lang)}" data-filename="${escHtml(filename)}">
                 <div class="code-header">
-                    <span class="code-lang">code</span>
+                    <span class="code-lang">${escHtml(label)}</span>
                     <span class="code-line-count">${code.split('\n').length} lines</span>
                     ${canvasBtn}${newTabBtn}
                     <button class="code-toggle collapsed" id="${id}_btn" onclick="toggleCode('${id}')">
@@ -509,26 +634,6 @@ function parseMarkdown(text, freshCounter) {
     }).join('');
 }
 
-function runCode(id) {
-    const block = document.getElementById(id);
-    if (!block) return;
-    const lang = block.dataset.lang || 'html';
-    const code = decodeURIComponent(block.dataset.code || '');
-    let content = code;
-    // Wrap JS/JSX in a basic HTML shell
-    if (['javascript','js','jsx'].includes(lang.toLowerCase())) {
-        content = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Run</title>
-<style>body{background:#030509;color:#f0f4ff;font-family:system-ui,sans-serif;padding:20px}</style>
-</head><body><script type="module">
-${code}
-<\/script></body></html>`;
-    }
-    const blob = new Blob([content], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    // Revoke after a moment to free memory
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
-}
 
 function toggleCode(id) {
     const body = document.getElementById(id + '_body');
@@ -603,6 +708,11 @@ function streamIntoElement(fullText, el, onDone) {
     el.appendChild(cursor);
 
     const INTERVAL = 33;
+    // Adaptive speed: no matter how much code the reply has, finish the
+    // animation in a bounded number of ticks (~250) so large multi-file
+    // responses never stall the page or take minutes to "type" out.
+    const MAX_TICKS = 250;
+    const tokensPerTick = Math.max(1, Math.ceil(tokens.length / MAX_TICKS));
 
     streamInterval = setInterval(() => {
         if (stopRequested || i >= tokens.length) {
@@ -619,7 +729,10 @@ function streamIntoElement(fullText, el, onDone) {
             return;
         }
 
-        accumulated += tokens[i++];
+        // Advance several tokens per tick when the reply is large.
+        for (let n = 0; n < tokensPerTick && i < tokens.length; n++) {
+            accumulated += tokens[i++];
+        }
 
         const fenceMatches = accumulated.match(/```/g) || [];
         const insideCodeBlock = fenceMatches.length % 2 === 1;
@@ -710,7 +823,7 @@ async function send() {
 
     {
         showTyping(true);
-        let reply = await callAPI(apiMsgs, model);
+        let reply = await callAPI(apiMsgs, model, 8192, buildSystemPrompt());
         showTyping(false);
         chat.messages.push({ role: 'assistant', content: [{ type: 'text', text: reply }] });
         save();
@@ -987,7 +1100,18 @@ function toggleFeature(f) {
 // Build system prompt based on active features
 function buildSystemPrompt() {
     const parts = [];
-    parts.push('You are a helpful, friendly AI assistant. Occasionally use relevant emojis in your responses — not on every sentence, but naturally sprinkled in where they fit (roughly every 2-4 sentences or at the start of a new topic). Never overdo it. Keep it natural and fun.');
+    parts.push('You are Wells.AI, a helpful, friendly coding-focused AI assistant. Occasionally use relevant emojis in your responses — not on every sentence, but naturally sprinkled in where they fit (roughly every 2-4 sentences or at the start of a new topic). Never overdo it. Keep it natural and fun.');
+
+    // Coding language policy — the app renders code in a Canvas that supports these 10 languages.
+    parts.push(
+        'CODING RULES:\n' +
+        '1. You may ONLY write code in these languages: HTML, CSS, JavaScript, TypeScript, Python, SQL, Bash/Shell, JSON, Markdown, and YAML. ' +
+        'Do NOT write code in any other language (no Java, C/C++, C#, Go, Rust, Ruby, PHP, Swift, etc.) unless the user EXPLICITLY asks for that specific language. If a task would normally use an unsupported language, either solve it in one of the supported languages or briefly explain the limitation and ask before proceeding.\n' +
+        '2. Put every code block in a fenced block whose info string is the language followed by a filename, e.g. ```js app.js  or  ```python main.py  or  ```html index.html. Always include a sensible filename so it shows as a tab in the Canvas.\n' +
+        '3. When a solution spans multiple files (e.g. an HTML page with separate CSS and JS), output each file as its OWN separate fenced code block with its own filename. For web apps prefer index.html + styles.css + script.js so they preview together in the Canvas.\n' +
+        '4. Use the language\'s canonical fence tag (html, css, js, ts, python, sql, bash, json, md, yaml).'
+    );
+
     if (features.thought) {
         parts.push('Before answering, reason through the problem step by step inside <thinking> tags. Then give your final answer. Format:\n<thinking>\n[your reasoning]\n</thinking>\n[your answer]');
     }
@@ -1058,95 +1182,251 @@ function renderThinkingBlock(thinking, container) {
 // ═══════════════════════════════════════════════════════════
 // CANVAS PANEL
 // ═══════════════════════════════════════════════════════════
-let canvasCurrentCode = '';
-let canvasCurrentLang = '';
-let canvasTab_active = 'preview';
+// ── Supported languages (the only ones the AI codes in unless asked) ──
+const SUPPORTED_LANGS = {
+    html:       { label: 'HTML',       ext: 'html', aliases: ['htm'] },
+    css:        { label: 'CSS',        ext: 'css',  aliases: [] },
+    javascript: { label: 'JavaScript', ext: 'js',   aliases: ['js','jsx','mjs'] },
+    typescript: { label: 'TypeScript', ext: 'ts',   aliases: ['ts','tsx'] },
+    python:     { label: 'Python',     ext: 'py',   aliases: ['py'] },
+    sql:        { label: 'SQL',        ext: 'sql',  aliases: [] },
+    bash:       { label: 'Bash',       ext: 'sh',   aliases: ['sh','shell','zsh','shellscript'] },
+    json:       { label: 'JSON',       ext: 'json', aliases: [] },
+    markdown:   { label: 'Markdown',   ext: 'md',   aliases: ['md'] },
+    yaml:       { label: 'YAML',       ext: 'yaml', aliases: ['yml'] }
+};
+const RENDERABLE_LANGS = ['html','css','javascript','markdown','svg'];
 
-function buildHtmlContent(code, lang) {
-    const base = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{background:#0d1117;color:#e6edf3;font-family:system-ui,sans-serif}
-  canvas{display:block}
-</style></head><body>`;
-
-    if (['javascript','js'].includes(lang)) {
-        // Wrap JS — use classic script (not module) so games work without imports
-        return base + `<script>
-try {
-${code}
-} catch(e) {
-  document.body.innerHTML = '<pre style="color:#fca5a5;padding:20px;font-size:13px">Error: '+e.message+'</pre>';
+function canonicalLang(raw) {
+    const l = (raw || '').toLowerCase().trim();
+    if (!l) return 'text';
+    if (l === 'svg') return 'svg';
+    if (SUPPORTED_LANGS[l]) return l;
+    for (const key in SUPPORTED_LANGS) {
+        if (SUPPORTED_LANGS[key].aliases.includes(l)) return key;
+    }
+    return l; // unknown — still display, just no highlight/preview
 }
-<\/script></body></html>`;
-    }
-    if (lang === 'svg') {
-        return base + `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh">${code}</div></body></html>`;
-    }
-    if (['markdown','md'].includes(lang)) {
-        return base + `<div style="padding:24px;max-width:720px;line-height:1.7">${parseMarkdown(code, false)}</div></body></html>`;
-    }
-    // html — use as-is, but inject a base style if it has no <html> tag
-    if (!code.trim().toLowerCase().startsWith('<!doctype') && !code.trim().toLowerCase().startsWith('<html')) {
-        return base + code + '</body></html>';
-    }
-    return code;
+function isRenderableLang(raw) { return RENDERABLE_LANGS.includes(canonicalLang(raw)); }
+function langLabel(raw) {
+    const c = canonicalLang(raw);
+    if (c === 'svg') return 'SVG';
+    return SUPPORTED_LANGS[c] ? SUPPORTED_LANGS[c].label : (raw || 'text');
+}
+function langExt(raw) {
+    const c = canonicalLang(raw);
+    if (c === 'svg') return 'svg';
+    return SUPPORTED_LANGS[c] ? SUPPORTED_LANGS[c].ext : 'txt';
 }
 
+// Parse a fence info string: "js app.js" or "python  main.py" → {lang, filename}
+function parseFenceInfo(info) {
+    const trimmed = (info || '').trim();
+    if (!trimmed) return { lang: 'text', filename: '' };
+    const bits = trimmed.split(/\s+/);
+    const lang = canonicalLang(bits[0]);
+    let filename = bits.slice(1).join(' ').replace(/^["'`]|["'`]$/g, '').trim();
+    // Also accept "title=app.js" style
+    filename = filename.replace(/^title=/i, '').replace(/^["']|["']$/g, '');
+    return { lang, filename };
+}
+
+// ═══ Canvas multi-file state ═══
+let canvasFiles = [];    // [{ name, lang, code }]
+let canvasActive = 0;
+let canvasView = 'code'; // 'preview' | 'code'
 let canvasBlobUrl = null;
 
+// Gather every code block that lives in the same message as the clicked one.
 function openCanvas(blockId) {
     const block = document.getElementById(blockId);
     if (!block) return;
-    const lang = (block.dataset.lang || 'html').toLowerCase();
-    const code = decodeURIComponent(block.dataset.code || '');
-    const lineCount = code.split('\n').length;
-    loadCanvas(code, lang, lang + ' · ' + lineCount + ' lines');
+    const container = block.closest('.msg-content') || block.parentElement;
+    const blocks = container ? [...container.querySelectorAll('.code-block')] : [block];
+    const files = blocks.map((b, i) => {
+        const lang = canonicalLang(b.dataset.lang);
+        const fn = (b.dataset.filename || '').trim();
+        return {
+            name: fn || defaultFileName(lang, i, blocks.length),
+            lang,
+            code: decodeURIComponent(b.dataset.code || '')
+        };
+    });
+    const activeIdx = Math.max(0, blocks.indexOf(block));
+    loadCanvasFiles(files, activeIdx);
 }
 
-function loadCanvas(code, lang, title) {
-    canvasCurrentCode = code;
-    canvasCurrentLang = lang;
+function defaultFileName(lang, i, total) {
+    const ext = langExt(lang);
+    if (total === 1) return 'file.' + ext;
+    return 'file' + (i + 1) + '.' + ext;
+}
 
-    const isRenderable = ['html','javascript','js','svg','markdown','md'].includes(lang);
-
+function loadCanvasFiles(files, activeIdx) {
+    canvasFiles = files.length ? files : [{ name: 'file.txt', lang: 'text', code: '' }];
+    canvasActive = Math.min(activeIdx || 0, canvasFiles.length - 1);
     document.getElementById('appGrid').classList.add('canvas-open');
-    document.getElementById('canvasTitle').textContent = title || lang;
-    document.getElementById('canvasTabPreview').style.display = isRenderable ? '' : 'none';
-    document.getElementById('canvasToolbar').style.display = isRenderable ? 'flex' : 'none';
-
-    canvasRender();
-    canvasTab(isRenderable ? 'preview' : 'code');
+    renderFileTabs();
+    // Prefer preview if the active file (or the group) can render, else code.
+    canvasView = isRenderableLang(canvasFiles[canvasActive].lang) ? 'preview' : 'code';
+    refreshCanvas();
 }
 
-function canvasRender() {
-    const lang = canvasCurrentLang;
-    const code = canvasCurrentCode;
+function renderFileTabs() {
+    const bar = document.getElementById('canvasFileTabs');
+    // Single unnamed file → hide the tab strip entirely (cleaner)
+    if (canvasFiles.length <= 1) { bar.style.display = 'none'; return; }
+    bar.style.display = 'flex';
+    bar.innerHTML = canvasFiles.map((f, i) => `
+        <button class="canvas-filetab ${i === canvasActive ? 'active' : ''}" onclick="switchCanvasFile(${i})" title="${escHtml(f.name)}">
+            <span class="ft-dot" style="background:${langColor(f.lang)}"></span>
+            <span class="ft-name">${escHtml(f.name)}</span>
+        </button>`).join('');
+}
+
+function langColor(lang) {
+    const map = {
+        html:'#e34c26', css:'#563d7c', javascript:'#f1e05a', typescript:'#3178c6',
+        python:'#3572A5', sql:'#e38c00', bash:'#89e051', json:'#cbcb41',
+        markdown:'#083fa1', yaml:'#cb171e', svg:'#ff9800'
+    };
+    return map[canonicalLang(lang)] || '#6b7a99';
+}
+
+function switchCanvasFile(i) {
+    canvasActive = i;
+    renderFileTabs();
+    // Keep current view if possible; if switching to a non-renderable file while on preview, drop to code.
+    if (canvasView === 'preview' && !groupCanPreview()) canvasView = 'code';
+    refreshCanvas();
+}
+
+// The group can preview if it contains any renderable file.
+function groupCanPreview() {
+    return canvasFiles.some(f => isRenderableLang(f.lang));
+}
+
+function activeFile() { return canvasFiles[canvasActive] || { name:'', lang:'text', code:'' }; }
+
+function refreshCanvas() {
+    const f = activeFile();
+    document.getElementById('canvasTitle').textContent = f.name;
+    document.getElementById('canvasLangBadge').textContent = langLabel(f.lang);
+
+    const canPreview = groupCanPreview();
+    const previewBtn = document.getElementById('canvasTabPreview');
+    previewBtn.disabled = !canPreview;
+    document.getElementById('canvasReloadBtn').style.display = canPreview ? '' : 'none';
+    document.getElementById('canvasNewTabBtn').style.display = canPreview ? '' : 'none';
+
+    if (canvasView === 'preview' && !canPreview) canvasView = 'code';
+
+    previewBtn.classList.toggle('active', canvasView === 'preview');
+    document.getElementById('canvasTabCode').classList.toggle('active', canvasView === 'code');
+
     const iframe = document.getElementById('canvasIframe');
+    const codeView = document.getElementById('canvasCodeView');
+    const placeholder = document.getElementById('canvasPlaceholder');
 
-    // Revoke previous blob to free memory
+    iframe.classList.toggle('active', canvasView === 'preview');
+    codeView.classList.toggle('active', canvasView === 'code');
+    placeholder.classList.remove('active');
+
+    // Always render the code editor for the active file
+    codeView.innerHTML = renderCodeEditor(f.code, f.lang);
+
+    if (canvasView === 'preview') renderPreview();
+}
+
+function renderPreview() {
+    const iframe = document.getElementById('canvasIframe');
     if (canvasBlobUrl) { URL.revokeObjectURL(canvasBlobUrl); canvasBlobUrl = null; }
+    const html = buildPreviewDoc();
+    if (html == null) {
+        // fall back to placeholder inside preview area
+        document.getElementById('canvasPlaceholder').classList.add('active');
+        iframe.classList.remove('active');
+        return;
+    }
+    const blob = new Blob([html], { type: 'text/html' });
+    canvasBlobUrl = URL.createObjectURL(blob);
+    iframe.src = canvasBlobUrl;
+}
 
-    if (['html','javascript','js','svg','markdown','md'].includes(lang)) {
-        const blob = new Blob([buildHtmlContent(code, lang)], { type: 'text/html' });
-        canvasBlobUrl = URL.createObjectURL(blob);
-        iframe.src = canvasBlobUrl;
-        // Don't revoke immediately — keep alive so iframe can load fully
-        // It gets revoked on next render or close
+// Build a single previewable HTML document from the file group.
+function buildPreviewDoc() {
+    const base = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>*{box-sizing:border-box}html,body{margin:0}body{background:#fff;color:#111;font-family:system-ui,sans-serif}</style></head><body>`;
+
+    const htmlFile = canvasFiles.find(f => canonicalLang(f.lang) === 'html');
+    const cssFiles = canvasFiles.filter(f => canonicalLang(f.lang) === 'css');
+    const jsFiles  = canvasFiles.filter(f => canonicalLang(f.lang) === 'javascript');
+    const styleTag = cssFiles.length ? '<style>\n' + cssFiles.map(f => f.code).join('\n') + '\n</style>' : '';
+    const scriptTag = jsFiles.length ? '<script>\ntry{\n' + jsFiles.map(f => f.code).join('\n') + '\n}catch(e){document.body.insertAdjacentHTML("beforeend","<pre style=\\"color:#c00;padding:16px\\">"+e.message+"</pre>");}\n<\/script>' : '';
+
+    // Case 1: there's an HTML file — treat it as the page and inject sibling css/js.
+    if (htmlFile) {
+        let doc = htmlFile.code;
+        const hasShell = /<html[\s>]/i.test(doc) || /<!doctype/i.test(doc);
+        if (!hasShell) doc = base + doc + '</body></html>';
+        // inject css before </head> (or after <body> start) and js before </body>
+        if (styleTag) {
+            doc = /<\/head>/i.test(doc) ? doc.replace(/<\/head>/i, styleTag + '</head>') : styleTag + doc;
+        }
+        if (scriptTag) {
+            doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, scriptTag + '</body>') : doc + scriptTag;
+        }
+        return doc;
     }
 
-    document.getElementById('canvasCodeView').textContent = code;
+    const active = activeFile();
+    const lang = canonicalLang(active.lang);
+
+    // Case 2: standalone CSS — show a sample page styled by it.
+    if (lang === 'css' || (!htmlFile && cssFiles.length && !jsFiles.length)) {
+        return base + `<style>${canvasFiles.filter(f=>canonicalLang(f.lang)==='css').map(f=>f.code).join('\n')}</style>
+        <main style="padding:24px;max-width:720px;margin:0 auto">
+          <h1>Heading 1</h1><h2>Heading 2</h2>
+          <p>Sample paragraph with <a href="#">a link</a> and <strong>bold</strong> text.</p>
+          <button>Button</button> <input placeholder="Input">
+          <ul><li>List item one</li><li>List item two</li></ul>
+          <blockquote>A block quote.</blockquote>
+        </main></body></html>`;
+    }
+
+    // Case 3: standalone JS — run it, plus any sibling css.
+    if (lang === 'javascript' || jsFiles.length) {
+        return base + styleTag + scriptTag + '</body></html>';
+    }
+
+    // Case 4: SVG
+    if (lang === 'svg') {
+        return base + `<div style="display:flex;align-items:center;justify-content:center;min-height:100vh">${active.code}</div></body></html>`;
+    }
+
+    // Case 5: Markdown
+    if (lang === 'markdown') {
+        return base + `<div style="padding:28px;max-width:760px;margin:0 auto;line-height:1.7;color:#111">${parseMarkdown(active.code, true)}</div></body></html>`;
+    }
+
+    return null;
 }
 
 function canvasTab(tab) {
-    canvasTab_active = tab;
-    const isRenderable = ['html','javascript','js','svg','markdown','md'].includes(canvasCurrentLang);
+    if (tab === 'preview' && !groupCanPreview()) return;
+    canvasView = tab;
+    refreshCanvas();
+}
 
-    document.getElementById('canvasTabPreview').classList.toggle('active', tab === 'preview');
-    document.getElementById('canvasTabCode').classList.toggle('active', tab === 'code');
-    document.getElementById('canvasIframe').classList.toggle('active', tab === 'preview' && isRenderable);
-    document.getElementById('canvasCodeView').classList.toggle('active', tab === 'code');
-    document.getElementById('canvasMdView').classList.remove('active'); // never used separately now
+function reloadCanvas() { if (canvasView === 'preview') renderPreview(); }
+
+function openCanvasNewTab() {
+    const html = buildPreviewDoc();
+    if (html == null) return;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
 function closeCanvas() {
@@ -1156,35 +1436,132 @@ function closeCanvas() {
     if (canvasBlobUrl) { URL.revokeObjectURL(canvasBlobUrl); canvasBlobUrl = null; }
 }
 
-function reloadCanvas() {
-    canvasRender();
+function copyCanvasFile() {
+    const f = activeFile();
+    navigator.clipboard.writeText(f.code).then(() => {
+        const t = document.getElementById('canvasTitle');
+        const old = t.textContent; t.textContent = '✓ Copied';
+        setTimeout(() => t.textContent = old, 1000);
+    }).catch(()=>{});
 }
 
-function openCanvasNewTab() {
-    const content = buildHtmlContent(canvasCurrentCode, canvasCurrentLang);
-    const blob = new Blob([content], { type: 'text/html' });
+function downloadCanvasFile() {
+    const f = activeFile();
+    const blob = new Blob([f.code], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    const a = document.createElement('a');
+    a.href = url; a.download = f.name || ('file.' + langExt(f.lang));
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
-function runCodeDirect(code, lang) {
-    const content = buildHtmlContent(code, lang);
-    const blob = new Blob([content], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 30000);
+// "Run in new tab" from a chat code block → open its group in a fresh tab.
+function runCode(id) {
+    const block = document.getElementById(id);
+    if (!block) return;
+    openCanvas(id);
+    openCanvasNewTab();
 }
 
-// Auto-open canvas when streaming finishes if response has runnable code
+// ── Code editor rendering: line-number gutter + syntax highlight ──
+function renderCodeEditor(code, lang) {
+    const highlighted = highlightCode(code, canonicalLang(lang));
+    const lineCount = code.split('\n').length;
+    let gutter = '';
+    for (let i = 1; i <= lineCount; i++) gutter += '<span>' + i + '</span>';
+    return `<div class="canvas-code-inner"><div class="code-gutter">${gutter}</div><pre>${highlighted}</pre></div>`;
+}
+
+// Lightweight generic syntax highlighter (offline, no deps).
+function highlightCode(code, lang) {
+    if (lang === 'html' || lang === 'svg' || lang === 'markdown') return highlightMarkup(code);
+    const cfg = HL_CONFIG[lang] || HL_CONFIG._default;
+    // tokenizer: comments & strings first (as protected regions), then keywords/numbers
+    const tokens = [];
+    let rest = code, guard = 0;
+    // We do a single pass with a combined regex.
+    const parts = [];
+    const re = cfg.regex;
+    let last = 0, m;
+    re.lastIndex = 0;
+    while ((m = re.exec(code)) !== null) {
+        if (m.index > last) parts.push(['text', code.slice(last, m.index)]);
+        let cls = 'text';
+        if (m.groups.com) cls = 'tok-com';
+        else if (m.groups.str) cls = 'tok-str';
+        else if (m.groups.num) cls = 'tok-num';
+        else if (m.groups.kw) cls = 'tok-kw';
+        else if (m.groups.fn) cls = 'tok-fn';
+        parts.push([cls, m[0]]);
+        last = re.lastIndex;
+        if (m.index === re.lastIndex) re.lastIndex++; // avoid zero-width loop
+    }
+    if (last < code.length) parts.push(['text', code.slice(last)]);
+    return parts.map(([cls, txt]) =>
+        cls === 'text' ? escHtml(txt) : `<span class="${cls}">${escHtml(txt)}</span>`
+    ).join('');
+}
+
+// Markup (HTML/XML/SVG/Markdown) highlighter — tags, attributes, strings, comments.
+function highlightMarkup(code) {
+    let out = escHtml(code);
+    // comments
+    out = out.replace(/&lt;!--[\s\S]*?--&gt;/g, m => `<span class="tok-com">${m}</span>`);
+    // tags
+    out = out.replace(/(&lt;\/?)([a-zA-Z][\w-]*)((?:[^&]|&(?!gt;))*?)(\/?&gt;)/g,
+        (full, open, name, attrs, close) => {
+            const hlAttrs = attrs.replace(/([a-zA-Z_:][\w:-]*)(=)(&quot;[^&]*&quot;|&#39;[^&]*&#39;)/g,
+                (a, k, eq, v) => `<span class="tok-attr">${k}</span>${eq}<span class="tok-str">${v}</span>`);
+            return `<span class="tok-punc">${open}</span><span class="tok-tag">${name}</span>${hlAttrs}<span class="tok-punc">${close}</span>`;
+        });
+    return out;
+}
+
+const KW = {
+    javascript: 'break case catch class const continue debugger default delete do else export extends finally for function if import in instanceof let new return super switch this throw try typeof var void while with yield async await of static get set null true false undefined NaN document window console',
+    typescript: 'break case catch class const continue debugger default delete do else export extends finally for function if implements import in instanceof interface let new return super switch this throw try typeof var void while with yield async await of static get set public private protected readonly type enum namespace as any string number boolean void never unknown null true false undefined',
+    python: 'and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield None True False self print len range str int float list dict set tuple',
+    sql: 'SELECT FROM WHERE INSERT INTO VALUES UPDATE SET DELETE CREATE TABLE ALTER DROP JOIN LEFT RIGHT INNER OUTER ON GROUP BY ORDER HAVING LIMIT OFFSET DISTINCT AS AND OR NOT NULL IS IN LIKE BETWEEN UNION ALL PRIMARY KEY FOREIGN REFERENCES INDEX VIEW DEFAULT COUNT SUM AVG MIN MAX CASE WHEN THEN ELSE END',
+    bash: 'if then else elif fi for while do done case esac function in return exit echo cd export local read set unset source alias then',
+    yaml: 'true false null yes no on off',
+    json: 'true false null',
+    _default: 'if else for while return function class import export const let var'
+};
+
+// Build per-language regex configs (named groups: com, str, num, kw, fn)
+const HL_CONFIG = {};
+(function buildHL() {
+    const strPart = `(?<str>"(?:\\\\.|[^"\\\\])*"|'(?:\\\\.|[^'\\\\])*'|\`(?:\\\\.|[^\`\\\\])*\`)`;
+    const numPart = `(?<num>\\b\\d[\\d_]*\\.?\\d*(?:[eE][+-]?\\d+)?\\b)`;
+    const configs = {
+        javascript: { com: `(?<com>\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)` },
+        typescript: { com: `(?<com>\\/\\/[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)` },
+        python:     { com: `(?<com>#[^\\n]*)` },
+        sql:        { com: `(?<com>--[^\\n]*|\\/\\*[\\s\\S]*?\\*\\/)` },
+        bash:       { com: `(?<com>#[^\\n]*)` },
+        yaml:       { com: `(?<com>#[^\\n]*)` },
+        json:       { com: '' },
+        _default:   { com: `(?<com>#[^\\n]*|\\/\\/[^\\n]*)` }
+    };
+    for (const lang in configs) {
+        const kws = (KW[lang] || KW._default).trim().split(/\s+/);
+        const kwPart = `(?<kw>\\b(?:${kws.join('|')})\\b)`;
+        const fnPart = `(?<fn>[A-Za-z_$][\\w$]*)(?=\\s*\\()`;
+        const comPart = configs[lang].com; // may be '' — then omitted
+        const flags = (lang === 'sql') ? 'gi' : 'g';
+        const alts = [comPart, strPart, numPart, kwPart, fnPart].filter(Boolean);
+        HL_CONFIG[lang] = { regex: new RegExp(alts.join('|'), flags) };
+    }
+})();
+
+// Auto-open canvas when a finished response contains code the AI wrote.
 function autoOpenCanvas(text) {
-    const matches = [...text.matchAll(/```(\w+)\n([\s\S]*?)```/g)];
+    // no-op auto-open kept minimal: only single renderable HTML doc auto-opens
+    const matches = [...text.matchAll(/```([^\n]*)\n([\s\S]*?)```/g)];
     if (matches.length === 1) {
-        const lang = matches[0][1].toLowerCase();
-        const code = matches[0][2];
-        if (['html','javascript','js','svg'].includes(lang)) {
-            const lineCount = code.split('\n').length;
-            loadCanvas(code, lang, lang + ' · ' + lineCount + ' lines · auto');
+        const meta = parseFenceInfo(matches[0][1]);
+        if (canonicalLang(meta.lang) === 'html') {
+            loadCanvasFiles([{ name: meta.filename || 'index.html', lang: 'html', code: matches[0][2] }], 0);
         }
     }
 }
