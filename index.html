@@ -51,6 +51,51 @@
     /* Fable 5 accent for the split-view model dot */
     .split-model-dot.fable { background: #f0abfc; }
 
+    /* ═══ FAKE GOOGLE DOCS (typing 123 toggles it) ═══ */
+    #docsOverlay {
+        display: none; position: fixed; inset: 0; z-index: 9999;
+        background: #f9fbfd; color: #202124;
+        font-family: 'Roboto', Arial, sans-serif; flex-direction: column;
+    }
+    #docsOverlay.show { display: flex; }
+    .docs-topbar {
+        display: flex; align-items: center; gap: 12px;
+        padding: 8px 16px; background: #f9fbfd; flex-shrink: 0;
+    }
+    .docs-logo { font-size: 26px; }
+    .docs-titlecol { flex: 1; min-width: 0; }
+    .docs-title {
+        border: none; background: transparent; font-size: 18px; color: #202124;
+        padding: 2px 6px; border-radius: 4px; outline: none; font-family: inherit; width: 320px; max-width: 60%;
+    }
+    .docs-title:hover, .docs-title:focus { box-shadow: inset 0 0 0 1px #dadce0; }
+    .docs-menus { display: flex; gap: 16px; padding: 2px 6px; font-size: 13px; color: #5f6368; }
+    .docs-menus span { cursor: default; }
+    .docs-hint { font-size: 12px; color: #80868b; white-space: nowrap; }
+    .docs-hint b { color: #1a73e8; }
+    .docs-toolbar {
+        display: flex; align-items: center; gap: 4px; margin: 0 16px 10px;
+        padding: 5px 10px; background: #edf2fa; border-radius: 24px; flex-shrink: 0;
+    }
+    .docs-tool {
+        display: flex; align-items: center; justify-content: center;
+        min-width: 30px; height: 30px; padding: 0 6px; border-radius: 4px;
+        font-size: 14px; color: #444746; cursor: default; user-select: none;
+    }
+    .docs-tool-wide { min-width: 96px; font-size: 13px; }
+    .docs-tool:hover { background: #dde3ea; }
+    .docs-sep { width: 1px; height: 20px; background: #c7cdd4; margin: 0 4px; }
+    .docs-pagewrap { flex: 1; overflow-y: auto; padding: 24px 16px 60px; }
+    .docs-page {
+        max-width: 816px; min-height: 1056px; margin: 0 auto;
+        background: #fff; box-shadow: 0 1px 3px rgba(60,64,67,0.3);
+        padding: 96px 96px; outline: none;
+        font-size: 15px; line-height: 1.6; color: #202124;
+    }
+    .docs-page:empty::before {
+        content: attr(data-placeholder); color: #bdc1c6; pointer-events: none;
+    }
+
     /* ═══ CANVAS V2 — consistent multi-file code panel ═══ */
     .app.canvas-open { grid-template-columns: 270px 1fr 480px; }
 
@@ -476,6 +521,33 @@
 
 </div>
 
+<!-- FAKE GOOGLE DOCS (toggle by typing 123) -->
+<div id="docsOverlay">
+    <div class="docs-topbar">
+        <div class="docs-logo">📄</div>
+        <div class="docs-titlecol">
+            <input class="docs-title" id="docsTitle" value="Untitled document" spellcheck="false" />
+            <div class="docs-menus">
+                <span>File</span><span>Edit</span><span>View</span><span>Insert</span>
+                <span>Format</span><span>Tools</span><span>Extensions</span><span>Help</span>
+            </div>
+        </div>
+        <div class="docs-hint">type <b>123</b> to close</div>
+    </div>
+    <div class="docs-toolbar">
+        <span class="docs-tool">↶</span><span class="docs-tool">↷</span><span class="docs-tool">🖨</span>
+        <span class="docs-sep"></span>
+        <span class="docs-tool docs-tool-wide">Normal text ▾</span>
+        <span class="docs-sep"></span>
+        <span class="docs-tool"><b>B</b></span><span class="docs-tool"><i>I</i></span><span class="docs-tool"><u>U</u></span>
+        <span class="docs-sep"></span>
+        <span class="docs-tool">🔗</span><span class="docs-tool">▤</span><span class="docs-tool">▦</span>
+    </div>
+    <div class="docs-pagewrap">
+        <div class="docs-page" id="docsPage" contenteditable="true" spellcheck="false" data-placeholder="Start typing… (type 123 to switch back to chat)" oninput="docsCheck()"></div>
+    </div>
+</div>
+
 <!-- SETTINGS MODAL -->
 <div id="settingsModal">
     <div class="modal-card" style="width:440px">
@@ -787,6 +859,8 @@ async function send() {
     const text = input.value.trim();
     if (!text && images.length === 0 && attachedFiles.length === 0) return;
 
+    // ── secret hotkey: 123 toggles the fake Google Docs ──
+    if (text === '123') { input.value = ''; input.style.height = 'auto'; openDocs(); return; }
     // ── slash commands ──
     if (text === '/split') { input.value = ''; input.style.height = 'auto'; enterSplit(); return; }
     if (text === '/exit')  { input.value = ''; input.style.height = 'auto'; exitSplit(); return; }
@@ -929,6 +1003,49 @@ function launchConfetti() {
         el.addEventListener('animationend', () => el.remove());
     }
 }
+
+// ═══════════════════════════════════════════════════════════
+// FAKE GOOGLE DOCS  (type 123 in chat to open, 123 in doc to close)
+// ═══════════════════════════════════════════════════════════
+function openDocs() {
+    const o = document.getElementById('docsOverlay');
+    o.classList.add('show');
+    const page = document.getElementById('docsPage');
+    // place the cursor in the page so the user can type immediately
+    setTimeout(() => { page.focus(); placeCaretEnd(page); }, 30);
+}
+
+function closeDocs() {
+    document.getElementById('docsOverlay').classList.remove('show');
+    const inp = document.getElementById('userInput');
+    if (inp) inp.focus();
+}
+
+// Called on every keystroke in the doc — typing 123 flips back to chat.
+function docsCheck() {
+    const page = document.getElementById('docsPage');
+    if (page.innerText.includes('123')) {
+        // strip the trigger so the doc's other text survives, then close
+        page.innerHTML = page.innerHTML.replace('123', '');
+        closeDocs();
+    }
+}
+
+function placeCaretEnd(el) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+}
+
+// Esc also closes the doc
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('docsOverlay').classList.contains('show')) {
+        closeDocs();
+    }
+});
 
 async function doRoast(target) {
     if (!CONFIG.key) { alert('Add your API key first!'); return; }
