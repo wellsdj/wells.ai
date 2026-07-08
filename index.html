@@ -362,7 +362,7 @@
                     <button class="model-btn" id="modelBtn" title="Select Model">⊕</button>
                     <div class="model-menu" id="modelMenu">
                         <button class="model-opt" data-model="claude-fable-5">Claude Fable 5<span>Most capable — 1M context</span></button>
-                        <button class="model-opt" data-model="claude-opus-4-6">Claude Opus 4.6<span>Frontier — logic &amp; 1M context</span></button>
+                        <button class="model-opt" data-model="claude-opus-4-8">Claude Opus 4.8<span>Frontier — logic &amp; 1M context</span></button>
                         <button class="model-opt" data-model="claude-sonnet-4-6">Claude Sonnet 4.6<span>Balanced speed &amp; intelligence</span></button>
                         <button class="model-opt selected" data-model="claude-haiku-4-5-20251001">Claude Haiku 4.5<span>Fast &amp; economical</span></button>
                     </div>
@@ -398,7 +398,7 @@
                         <div class="split-model-menu" id="splitMenuA">
                             <button class="split-model-opt active" data-model="claude-haiku-4-5-20251001" onclick="setSplitModel('A','claude-haiku-4-5-20251001',event)">Haiku 4.5<span>Fast &amp; economical</span></button>
                             <button class="split-model-opt" data-model="claude-sonnet-4-6" onclick="setSplitModel('A','claude-sonnet-4-6',event)">Sonnet 4.6<span>Balanced</span></button>
-                            <button class="split-model-opt" data-model="claude-opus-4-6" onclick="setSplitModel('A','claude-opus-4-6',event)">Opus 4.6<span>Frontier</span></button>
+                            <button class="split-model-opt" data-model="claude-opus-4-8" onclick="setSplitModel('A','claude-opus-4-8',event)">Opus 4.8<span>Frontier</span></button>
                             <button class="split-model-opt" data-model="claude-fable-5" onclick="setSplitModel('A','claude-fable-5',event)">Fable 5<span>Most capable</span></button>
                         </div>
                     </div>
@@ -426,7 +426,7 @@
                         <div class="split-model-menu" id="splitMenuB">
                             <button class="split-model-opt" data-model="claude-haiku-4-5-20251001" onclick="setSplitModel('B','claude-haiku-4-5-20251001',event)">Haiku 4.5<span>Fast &amp; economical</span></button>
                             <button class="split-model-opt active" data-model="claude-sonnet-4-6" onclick="setSplitModel('B','claude-sonnet-4-6',event)">Sonnet 4.6<span>Balanced</span></button>
-                            <button class="split-model-opt" data-model="claude-opus-4-6" onclick="setSplitModel('B','claude-opus-4-6',event)">Opus 4.6<span>Frontier</span></button>
+                            <button class="split-model-opt" data-model="claude-opus-4-8" onclick="setSplitModel('B','claude-opus-4-8',event)">Opus 4.8<span>Frontier</span></button>
                             <button class="split-model-opt" data-model="claude-fable-5" onclick="setSplitModel('B','claude-fable-5',event)">Fable 5<span>Most capable</span></button>
                         </div>
                     </div>
@@ -1017,7 +1017,7 @@ const PRICING = {
     // per 1M tokens
     'claude-haiku-4-5-20251001': { input: 0.80,  output: 4.00  },
     'claude-sonnet-4-6':         { input: 3.00,  output: 15.00 },
-    'claude-opus-4-6':           { input: 15.00, output: 75.00 },
+    'claude-opus-4-8':           { input: 5.00,  output: 25.00 },
     'claude-fable-5':            { input: 10.00, output: 50.00 },
 };
 
@@ -1571,7 +1571,7 @@ const splitState = {
 
 function modelShortName(mdl) {
     if (mdl.includes('fable'))  return 'Fable 5';
-    if (mdl.includes('opus'))   return 'Opus 4.6';
+    if (mdl.includes('opus'))   return 'Opus 4.8';
     if (mdl.includes('sonnet')) return 'Sonnet 4.6';
     return 'Haiku 4.5';
 }
@@ -1708,7 +1708,7 @@ function appendUserMessage(m) {
 
 function appendBotMessageShell() {
     const container = document.getElementById('messages');
-    const av = model.includes('opus') ? 'Opus 4.6' : model.includes('sonnet') ? 'Sonnet 4.6' : 'Haiku 4.5';
+    const av = modelShortName(model);
     const div = document.createElement('div');
     div.className = 'message';
     div.innerHTML = `<div class="avatar bot">${av}</div><div class="msg-content"></div>`;
@@ -1727,7 +1727,7 @@ function renderMessages() {
     codeBlockCounter = 0;
     container.innerHTML = chat.messages.map(m => {
         const isUser = m.role === 'user';
-        const av = isUser ? 'YOU' : (model.includes('opus') ? 'Opus 4.6' : model.includes('sonnet') ? 'Sonnet 4.6' : 'Haiku 4.5');
+        const av = isUser ? 'YOU' : modelShortName(model);
         let inner;
         if (isUser) {
             let rawTxt2 = m.content.filter(c => c.type === 'text').map(c => c.text).join('');
@@ -1752,7 +1752,7 @@ function renderMessages() {
 
 function showTyping(v) {
     document.getElementById('typingIndicator').style.display = v ? 'block' : 'none';
-    document.getElementById('typingAvatar').textContent = model.includes('opus') ? 'Opus 4.6' : model.includes('sonnet') ? 'Sonnet 4.6' : 'Haiku 4.5';
+    document.getElementById('typingAvatar').textContent = modelShortName(model);
     if (v) scrollBottom();
 }
 

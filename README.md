@@ -6,7 +6,7 @@ A sleek, self-contained single-file AI chat interface that connects directly to 
 
 ## What It Is
 
-`wells-ai.html` is a feature-rich chat UI built entirely in vanilla HTML, CSS, and JavaScript. It communicates with the Anthropic API directly from the browser using your API key, which is never saved or stored anywhere.
+`index.html` is a feature-rich chat UI built entirely in vanilla HTML, CSS, and JavaScript. It communicates with the Anthropic API directly from the browser using your API key, which is never saved or stored anywhere.
 
 ---
 
@@ -53,7 +53,7 @@ Set a custom system prompt per session via the Settings modal.
 
 ## Getting Started
 
-1. Open `wells-ai.html` in any modern browser.
+1. Open `index.html` in any modern browser.
 2. Click the **Settings** (gear) icon.
 3. Enter your Anthropic API key (`sk-ant-api03-...`). It is only held in memory and is gone when you refresh.
 4. Start chatting.
