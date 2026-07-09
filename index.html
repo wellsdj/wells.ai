@@ -51,6 +51,41 @@
     /* Fable 5 accent for the split-view model dot */
     .split-model-dot.fable { background: #f0abfc; }
 
+    /* ═══ GEMINI MODE ═══ */
+    .topbar {
+        display: flex; align-items: center; justify-content: flex-end;
+        padding: 8px 12px 0; flex-shrink: 0;
+    }
+    .gemini-toggle {
+        display: flex; align-items: center; gap: 7px;
+        padding: 6px 12px; border-radius: 20px; cursor: pointer;
+        background: var(--glass); border: 1px solid var(--glass-border);
+        color: var(--muted); font-family: inherit; font-size: 12.5px;
+        font-weight: 600; transition: 0.18s;
+    }
+    .gemini-toggle:hover { background: var(--glass2); color: var(--text); }
+    .gemini-toggle .gemini-spark { font-size: 13px; transition: 0.18s; }
+    .gemini-toggle .gemini-state {
+        font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+        padding: 2px 7px; border-radius: 10px; background: rgba(255,255,255,0.08); color: var(--muted);
+    }
+    /* Active (on) state — Google blue */
+    .gemini-toggle.on {
+        background: linear-gradient(135deg, #4285F4, #1a73e8);
+        border-color: #4285F4; color: #fff;
+        box-shadow: 0 3px 14px rgba(66,133,244,0.45);
+    }
+    .gemini-toggle.on .gemini-spark { color: #fff; }
+    .gemini-toggle.on .gemini-state { background: rgba(255,255,255,0.25); color: #fff; }
+
+    /* When Gemini mode is on, retheme the accent to Google blue */
+    body.gemini-mode {
+        --accent: #1a73e8;
+    }
+    body.gemini-mode .btn-send { background: linear-gradient(135deg, #4285F4, #1a73e8); }
+    body.gemini-mode .avatar.bot { background: linear-gradient(135deg, #4285F4, #1a73e8); }
+    body.gemini-mode #modelBadge { color: #8ab4f8; }
+
     /* ═══ FAKE GOOGLE DOCS (typing 123 toggles it) ═══ */
     #docsOverlay {
         display: none; position: fixed; inset: 0; z-index: 9999;
@@ -270,6 +305,14 @@
 
     <!-- MAIN PANEL -->
     <main class="main" id="mainPanel">
+
+        <div class="topbar">
+            <button class="gemini-toggle" id="geminiToggle" onclick="toggleGemini()" title="Use free Gemini (no API key needed)">
+                <span class="gemini-spark">✦</span>
+                <span class="gemini-label">Gemini</span>
+                <span class="gemini-state" id="geminiState">off</span>
+            </button>
+        </div>
 
         <div class="chat-window" id="chatWindow">
             <div class="drop-zone" id="dropZone">📎 Drop images or files to attach</div>
@@ -576,6 +619,7 @@ let attachedFiles = [];
 let splitMode = false;
 let CONFIG = { key: '', braveKey: '' }; // never stored to localStorage
 let features = { thought: false, web: false };
+let geminiMode = localStorage.getItem('wai_gemini') === '1'; // free Gemini via serverless key
 let chats = JSON.parse(localStorage.getItem('wai_chats') || '[]');
 let activeId = null; // always start fresh on load — new chat created at INIT
 let isStreaming = false;
@@ -595,7 +639,7 @@ document.querySelectorAll('.model-opt').forEach(btn => {
         model = this.dataset.model;
         document.querySelectorAll('.model-opt').forEach(b => b.classList.remove('selected'));
         this.classList.add('selected');
-        document.getElementById('modelBadge').textContent = '▸ ' + model;
+        if (!geminiMode) document.getElementById('modelBadge').textContent = '▸ ' + model;
         document.getElementById('modelMenu').classList.remove('show');
     };
 });
@@ -728,7 +772,9 @@ function toggleCode(id) {
 // ═══════════════════════════════════════════════════════════
 async function callAPI(msgs, mdl, maxTok, sysPrompt) {
     maxTok = maxTok || 4096;
-    if (!CONFIG.key) return 'Error: API Key missing. Click ⚙ to add your key.';
+    // Gemini mode → route through our serverless proxy (free, no key needed).
+    if (geminiMode) return callGemini(msgs, sysPrompt, maxTok);
+    if (!CONFIG.key) return 'Error: API Key missing. Turn on Gemini (top-right) for free use, or click ⚙ to add your Claude key.';
     try {
         const body = { model: mdl, max_tokens: maxTok, messages: msgs };
         if (sysPrompt) body.system = sysPrompt;
@@ -763,6 +809,39 @@ async function callAPI(msgs, mdl, maxTok, sysPrompt) {
     } catch(e) {
         return 'Connection Error: ' + e.message;
     }
+}
+
+// ── Gemini (free, via /api/gemini serverless proxy) ──
+async function callGemini(msgs, sysPrompt, maxTok) {
+    try {
+        const res = await fetch('/api/gemini', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ messages: msgs, system: sysPrompt, maxTokens: maxTok || 4096 })
+        });
+        if (!res.ok) return 'Error: Gemini backend unavailable (' + res.status + '). Is this running on Vercel with Gemini_API set?';
+        const d = await res.json();
+        if (d.error) return 'Error: ' + d.error;
+        return d.text || '(no response)';
+    } catch(e) {
+        return 'Connection Error: ' + e.message;
+    }
+}
+
+// Toggle Gemini mode on/off — blue UI when on, no API key required.
+function toggleGemini() {
+    geminiMode = !geminiMode;
+    localStorage.setItem('wai_gemini', geminiMode ? '1' : '0');
+    applyGeminiUI();
+}
+function applyGeminiUI() {
+    const btn = document.getElementById('geminiToggle');
+    const state = document.getElementById('geminiState');
+    document.body.classList.toggle('gemini-mode', geminiMode);
+    if (btn) btn.classList.toggle('on', geminiMode);
+    if (state) state.textContent = geminiMode ? 'on' : 'off';
+    const badge = document.getElementById('modelBadge');
+    if (badge) badge.textContent = geminiMode ? '✦ gemini-2.0-flash (free)' : '▸ ' + model;
 }
 
 async function generateChatName(firstMessage) {
@@ -1048,7 +1127,7 @@ document.addEventListener('keydown', e => {
 });
 
 async function doRoast(target) {
-    if (!CONFIG.key) { alert('Add your API key first!'); return; }
+    if (!geminiMode && !CONFIG.key) { alert('Turn on Gemini (top-right) for free use, or add your Claude API key first!'); return; }
     const subject = target.trim() || 'the person using this app';
     const reply = await callAPI(
         [{ role: 'user', content: 'Give me a single savage, witty, funny roast of: ' + subject + '. Max 2 sentences. No intro, just the roast. Be brutal but funny, not mean-spirited.' }],
@@ -2127,7 +2206,7 @@ let learnCurrent = 0;
 
 async function doLearn(topic) {
     if (!topic) { alert('Type a topic! e.g. /learn black holes'); return; }
-    if (!CONFIG.key) { alert('Add your API key first!'); return; }
+    if (!geminiMode && !CONFIG.key) { alert('Turn on Gemini (top-right) for free use, or add your Claude API key first!'); return; }
 
     document.getElementById('learnOverlay').classList.add('show');
     document.getElementById('learnTopic').textContent = topic;
@@ -2211,6 +2290,7 @@ if (chats.length > 0) {
     newChat();
 }
 renderUsage();
+applyGeminiUI();
 </script>
 <!-- LEARN OVERLAY -->
 <div class="learn-overlay" id="learnOverlay">
