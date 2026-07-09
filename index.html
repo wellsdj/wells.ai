@@ -86,6 +86,27 @@
     body.gemini-mode .avatar.bot { background: linear-gradient(135deg, #4285F4, #1a73e8); }
     body.gemini-mode #modelBadge { color: #8ab4f8; }
 
+    /* ═══ EDIT / TODO / THINKING CARDS ═══ */
+    .edit-card { border: 1px solid rgba(52,211,153,0.35); background: rgba(16,185,129,0.06); border-radius: 10px; margin: 8px 0; overflow: hidden; }
+    .edit-card-head { padding: 8px 12px; font-size: 12.5px; color: #6ee7b7; background: rgba(16,185,129,0.10); }
+    .edit-diff { padding: 8px 12px; max-height: 280px; overflow: auto; font-family: var(--font-mono); font-size: 12px; line-height: 1.5; }
+    .ed-del { color: #fca5a5; } .ed-add { color: #86efac; } .ed-gap { height: 6px; }
+
+    .todo-card { border: 1px solid rgba(37,99,235,0.30); background: rgba(37,99,235,0.06); border-radius: 10px; margin: 8px 0; padding: 6px 4px 8px; overflow: hidden; }
+    .todo-head { padding: 4px 12px 8px; font-size: 12.5px; font-weight: 600; color: #93c5fd; }
+    .todo-item { display: flex; align-items: flex-start; gap: 8px; padding: 4px 12px; font-size: 13.5px; }
+    .todo-item .todo-box { color: #60a5fa; }
+    .todo-item.done .todo-text { color: var(--muted); text-decoration: line-through; }
+    .todo-item.done .todo-box { color: #34d399; }
+
+    .think-card { border: 1px solid var(--glass-border); background: var(--glass); border-radius: 10px; margin: 8px 0; overflow: hidden; }
+    .think-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 12px; background: none; border: none; color: var(--muted); cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 600; }
+    .think-head:hover { color: var(--text); }
+    .think-head .think-chev { transition: 0.15s; }
+    .think-head.open .think-chev { transform: rotate(180deg); }
+    .think-body { display: none; padding: 4px 14px 12px; font-size: 12.5px; line-height: 1.6; color: var(--muted); font-style: italic; border-top: 1px solid var(--glass-border); }
+    .think-body.open { display: block; }
+
     /* ═══ FAKE GOOGLE DOCS (typing 123 toggles it) ═══ */
     #docsOverlay {
         display: none; position: fixed; inset: 0; z-index: 9999;
@@ -719,12 +740,17 @@ function escHtml(t) {
 // ═══════════════════════════════════════════════════════════
 function parseMarkdown(text, freshCounter) {
     if (freshCounter) codeBlockCounter = 0;
+    // Pull out <thinking>…</thinking> sections and render them as thought cards.
+    text = text.replace(/<thinking>\n?([\s\S]*?)<\/thinking>/g, (m, inner) => '@@THINK@@' + encodeURIComponent(inner) + '@@ENDTHINK@@');
     const parts = text.split(/(```[^\n]*\n[\s\S]*?```)/g);
     return parts.map(part => {
         if (part.startsWith('```')) {
             const firstNewline = part.indexOf('\n');
             const info = part.slice(3, firstNewline).trim();
             const code = part.slice(firstNewline + 1, -3);
+            // Special coding fences: edit (diff card) and todo (checklist).
+            if (/^edit\b/i.test(info)) return renderEditCard(info.replace(/^edit\s*/i, '').trim(), code);
+            if (/^todo\b/i.test(info)) return renderTodoCard(code);
             const id = 'cb' + (++codeBlockCounter);
             const meta = parseFenceInfo(info);            // { lang, filename }
             const lang = meta.lang;
@@ -747,10 +773,15 @@ function parseMarkdown(text, freshCounter) {
                 </div>
             </div>`;
         } else {
-            return escHtml(part)
+            let html = escHtml(part)
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/`([^`\n]+)`/g, '<code style="background:rgba(37,99,235,0.15);padding:1px 6px;border-radius:4px;font-family:monospace;font-size:13px;">$1</code>')
                 .replace(/\n/g, '<br>');
+            // Re-insert thought cards (placeholders survive escaping as plain text).
+            html = html.replace(/@@THINK@@([^@]+)@@ENDTHINK@@/g, (m, enc) => {
+                try { return renderThinking(decodeURIComponent(enc)); } catch(e) { return ''; }
+            });
+            return html;
         }
     }).join('');
 }
@@ -770,14 +801,20 @@ function toggleCode(id) {
 // ═══════════════════════════════════════════════════════════
 // API CALL
 // ═══════════════════════════════════════════════════════════
-async function callAPI(msgs, mdl, maxTok, sysPrompt) {
+async function callAPI(msgs, mdl, maxTok, sysPrompt, opts) {
     maxTok = maxTok || 4096;
+    opts = opts || {};
     // Gemini mode → route through our serverless proxy (free, no key needed).
     if (geminiMode) return callGemini(msgs, sysPrompt, maxTok);
     if (!CONFIG.key) return 'Error: API Key missing. Turn on Gemini (top-right) for free use, or click ⚙ to add your Claude key.';
     try {
         const body = { model: mdl, max_tokens: maxTok, messages: msgs };
         if (sysPrompt) body.system = sysPrompt;
+        // Native adaptive thinking for supported models — returns a summarized
+        // thought process we render as a collapsible block.
+        if (opts.apiThink && ADAPTIVE_THINK_MODELS.includes(mdl)) {
+            body.thinking = { type: 'adaptive', display: 'summarized' };
+        }
         const res = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
@@ -805,7 +842,16 @@ async function callAPI(msgs, mdl, maxTok, sysPrompt) {
         if (d.usage && mdl !== 'claude-haiku-4-5-20251001' || d.usage) {
             trackUsage(d.usage.input_tokens || 0, d.usage.output_tokens || 0, mdl);
         }
-        return d.content[0].text;
+        // Assemble reply from content blocks. Thinking blocks (if any) are
+        // wrapped in <thinking> so the UI renders them as a thought process.
+        const blocks = d.content || [];
+        let thinking = '', textOut = '';
+        for (const b of blocks) {
+            if (b.type === 'thinking' && b.thinking) thinking += b.thinking + '\n';
+            else if (b.type === 'text') textOut += b.text;
+        }
+        if (!textOut && blocks[0] && blocks[0].text) textOut = blocks[0].text;
+        return (thinking.trim() ? '<thinking>\n' + thinking.trim() + '\n</thinking>\n\n' : '') + textOut;
     } catch(e) {
         return 'Connection Error: ' + e.message;
     }
@@ -1002,8 +1048,32 @@ async function send() {
 
     {
         showTyping(true);
-        let reply = await callAPI(apiMsgs, model, 8192, buildSystemPrompt());
+        const complex = looksComplex(text);
+        const wantThink = features.thought || complex;
+        const apiThink = wantThink && !geminiMode && ADAPTIVE_THINK_MODELS.includes(model);
+        const promptThink = wantThink && !apiThink; // Gemini / Haiku fall back to <thinking> prompt
+
+        // Web search for complex/factual tasks (only when a Brave key is set).
+        let searchResults = null;
+        if (features.web && CONFIG.braveKey && (complex || needsWebSearch(text))) {
+            setAiStatus('🔍 Searching the web…');
+            searchResults = await webSearch(text);
+        }
+
+        if (wantThink) setAiStatus('💭 Thinking…');
+        const sysPrompt = buildSystemPrompt({
+            editContext: editSessionActive() ? editContextPrompt() : '',
+            thinkPrompt: promptThink,
+            searchResults: searchResults
+        });
+
+        let reply = await callAPI(apiMsgs, model, 8192, sysPrompt, { apiThink });
+        clearAiStatus();
         showTyping(false);
+
+        // Apply any live edits to the Canvas working copy (edit tool).
+        applyEditsFromReply(reply);
+
         chat.messages.push({ role: 'assistant', content: [{ type: 'text', text: reply }] });
         save();
         isStreaming = true;
@@ -1311,7 +1381,8 @@ function toggleFeature(f) {
 }
 
 // Build system prompt based on active features
-function buildSystemPrompt() {
+function buildSystemPrompt(opts) {
+    opts = opts || {};
     const parts = [];
     parts.push('You are Wells.AI, a helpful, friendly coding-focused AI assistant. Occasionally use relevant emojis in your responses — not on every sentence, but naturally sprinkled in where they fit (roughly every 2-4 sentences or at the start of a new topic). Never overdo it. Keep it natural and fun.');
 
@@ -1325,13 +1396,150 @@ function buildSystemPrompt() {
         '4. Use the language\'s canonical fence tag (html, css, js, ts, python, sql, bash, json, md, yaml).'
     );
 
-    if (features.thought) {
-        parts.push('Before answering, reason through the problem step by step inside <thinking> tags. Then give your final answer. Format:\n<thinking>\n[your reasoning]\n</thinking>\n[your answer]');
+    // ── Coding techniques (plan → think → build → verify), Claude-style ──
+    parts.push(
+        'CODING TECHNIQUE — for any non-trivial coding task, work like a senior engineer:\n' +
+        '1. PLAN with a TODO list FIRST. Emit a fenced ```todo block, one item per line as "- [ ] step". Keep it short (2-6 steps). Example:\n' +
+        '```todo\n- [ ] Set up the HTML structure\n- [ ] Add the styling\n- [ ] Wire up the JS logic\n```\n' +
+        '2. Then build the code (following the CODING RULES above).\n' +
+        '3. When you finish, RE-EMIT the same ```todo block with completed steps checked off as "- [x] step", so the checklist updates. Add any new steps you discovered. Always keep the todo list current across the whole session.\n' +
+        '4. For simple one-liners or plain questions, skip the todo list.'
+    );
+
+    // ── Live edit mode: the Canvas already holds working code ──
+    if (opts.editContext) parts.push(opts.editContext);
+
+    // ── Prompt-based thinking (used for models without native API thinking) ──
+    if (opts.thinkPrompt) {
+        parts.push('Before answering, reason through the problem step by step inside <thinking> tags — plan your approach, consider edge cases, and think hard about complex parts. Then give your final answer. Format:\n<thinking>\n[your reasoning]\n</thinking>\n[your answer]');
+    }
+
+    // ── Web search results injected by the app ──
+    if (opts.searchResults) {
+        parts.push('The user\'s app searched the web for this task. Use these fresh results where relevant and cite naturally:\n\n' + opts.searchResults);
     }
     return parts.join('\n\n');
 }
 
+// Models that support native adaptive thinking via the API.
+const ADAPTIVE_THINK_MODELS = ['claude-opus-4-8', 'claude-sonnet-4-6', 'claude-fable-5'];
+
+// Heuristic: does this message look like a complex coding / research task?
+function looksComplex(text) {
+    const t = (text || '').toLowerCase();
+    if (t.length > 220) return true;
+    return /\b(build|create|make|code|implement|refactor|debug|fix|design|app|website|game|function|component|api|algorithm|architecture|optimi[sz]e|research|compare|explain how|why does|latest|current|today|202\d)\b/.test(t);
+}
+
+// ═══════════════════════════════════════════════════════════
+// LIVE EDIT TOOL — the AI edits the open Canvas code with
+// SEARCH/REPLACE blocks instead of regenerating whole files.
+// ═══════════════════════════════════════════════════════════
+function editSessionActive() {
+    return document.getElementById('appGrid').classList.contains('canvas-open')
+        && Array.isArray(canvasFiles) && canvasFiles.length > 0
+        && canvasFiles.some(f => (f.code || '').trim().length > 0);
+}
+
+function editContextPrompt() {
+    const files = canvasFiles.map(f =>
+        'FILE: ' + f.name + '\n```' + f.lang + '\n' + f.code + '\n```'
+    ).join('\n\n');
+    return 'LIVE CANVAS EDIT MODE — the user has this code open in the Canvas right now:\n\n' + files + '\n\n' +
+        'If the user asks to change, fix, add to, or refactor this code, DO NOT reprint the whole file. ' +
+        'Instead reply with one or more edit blocks in EXACTLY this format:\n' +
+        '```edit FILENAME\n<<<<<<< SEARCH\n<exact lines that currently exist>\n=======\n<the replacement lines>\n>>>>>>> REPLACE\n```\n' +
+        'Rules: copy the SEARCH text verbatim from the current file (enough lines to be unique). Use separate blocks for separate spots or files. ' +
+        'To append brand-new code with no anchor, leave the SEARCH section empty. Add a one-line explanation before the blocks. ' +
+        'If the request is NOT about editing this code, just answer normally.';
+}
+
+const EDIT_PAIR_RE = /<<<<<<< SEARCH\n?([\s\S]*?)\n?=======\n?([\s\S]*?)\n?>>>>>>> REPLACE/g;
+
+function parseEditBlocks(text) {
+    const blocks = [];
+    const re = /```edit([^\n]*)\n([\s\S]*?)```/g;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+        const filename = m[1].trim();
+        const pairs = [];
+        let p; EDIT_PAIR_RE.lastIndex = 0;
+        while ((p = EDIT_PAIR_RE.exec(m[2])) !== null) pairs.push({ search: p[1], replace: p[2] });
+        if (pairs.length) blocks.push({ filename, pairs });
+    }
+    return blocks;
+}
+
+function applyEditsFromReply(reply) {
+    if (!editSessionActive()) return 0;
+    const blocks = parseEditBlocks(reply);
+    if (!blocks.length) return 0;
+    let applied = 0, lastIdx = canvasActive;
+    for (const b of blocks) {
+        let idx = canvasFiles.findIndex(f => f.name === b.filename);
+        if (idx < 0) idx = canvasFiles.findIndex(f => f.name.split('/').pop() === b.filename.split('/').pop());
+        if (idx < 0) idx = (canvasFiles.length === 1 ? 0 : -1);
+        if (idx < 0) continue;
+        let code = canvasFiles[idx].code;
+        for (const pr of b.pairs) {
+            const s = pr.search.replace(/\n+$/, '');
+            if (s.trim() === '') { code = code + (code.endsWith('\n') ? '' : '\n') + pr.replace; applied++; }
+            else if (code.includes(s)) { code = code.replace(s, pr.replace); applied++; }
+        }
+        canvasFiles[idx].code = code;
+        lastIdx = idx;
+    }
+    if (applied) { canvasActive = lastIdx; renderFileTabs(); refreshCanvas(); }
+    return applied;
+}
+
+// Render a ```edit block in chat as a compact "✎ Edited" diff card.
+function renderEditCard(filename, body) {
+    const pairs = [];
+    let p; EDIT_PAIR_RE.lastIndex = 0;
+    while ((p = EDIT_PAIR_RE.exec(body)) !== null) pairs.push({ search: p[1], replace: p[2] });
+    const cap = (s) => { const lines = s.split('\n'); return lines.length > 14 ? lines.slice(0, 14).concat('…').join('\n') : s; };
+    const rows = pairs.map(pr => {
+        const del = pr.search.trim()
+            ? '<div class="ed-del">' + escHtml(cap(pr.search)).split('\n').map(l => '- ' + l).join('<br>') + '</div>' : '';
+        const add = '<div class="ed-add">' + escHtml(cap(pr.replace)).split('\n').map(l => '+ ' + l).join('<br>') + '</div>';
+        return del + add;
+    }).join('<div class="ed-gap"></div>');
+    const n = pairs.length;
+    return '<div class="edit-card"><div class="edit-card-head">✎ Edited <b>' + escHtml(filename || 'file') + '</b> · ' + n + ' change' + (n === 1 ? '' : 's') + '</div><div class="edit-diff">' + rows + '</div></div>';
+}
+
+// Render a ```todo block as an interactive checklist card.
+function renderTodoCard(body) {
+    const items = body.split('\n').map(l => l.trim()).filter(l => /^- \[[ xX]\]/.test(l));
+    if (!items.length) return '';
+    const done = items.filter(l => /^- \[[xX]\]/.test(l)).length;
+    const rows = items.map(l => {
+        const checked = /^- \[[xX]\]/.test(l);
+        const label = l.replace(/^- \[[ xX]\]\s*/, '');
+        return '<div class="todo-item ' + (checked ? 'done' : '') + '"><span class="todo-box">' + (checked ? '☑' : '☐') + '</span><span class="todo-text">' + escHtml(label) + '</span></div>';
+    }).join('');
+    return '<div class="todo-card"><div class="todo-head">✅ Plan · ' + done + '/' + items.length + ' done</div>' + rows + '</div>';
+}
+
+// Render a <thinking>…</thinking> section as a collapsible thought process.
+let thinkBlockCounter = 0;
+function renderThinking(inner) {
+    const id = 'think' + (++thinkBlockCounter);
+    return '<div class="think-card"><button class="think-head" onclick="document.getElementById(\'' + id + '\').classList.toggle(\'open\'); this.classList.toggle(\'open\')">💭 Thought process<span class="think-chev">▾</span></button><div class="think-body" id="' + id + '">' + escHtml(inner).replace(/\n/g, '<br>') + '</div></div>';
+}
+
 // Brave Search
+// Show/hide a live status pill (Thinking… / Searching…) like Claude.
+function setAiStatus(text) {
+    const el = document.getElementById('searchStatus');
+    document.getElementById('searchStatusText').textContent = text;
+    el.classList.add('active');
+}
+function clearAiStatus() {
+    document.getElementById('searchStatus').classList.remove('active');
+}
+
 async function webSearch(query) {
     if (!CONFIG.braveKey) return null;
     try {
