@@ -812,7 +812,18 @@ async function callAPI(msgs, mdl, maxTok, sysPrompt) {
 }
 
 // ── Gemini (free, via /api/gemini serverless proxy) ──
+// Estimated spend cap so the shared free key can't be run up. ~3 pence ≈ $0.038.
+const GEMINI_LIMIT = 0.038;          // USD (~3p)
+const GEMINI_IN_RATE = 0.10;         // $/1M input tokens  (gemini-2.0-flash)
+const GEMINI_OUT_RATE = 0.40;        // $/1M output tokens
+function loadGemSpend() { return parseFloat(localStorage.getItem('wai_gem_spend') || '0') || 0; }
+function saveGemSpend(v) { localStorage.setItem('wai_gem_spend', String(v)); }
+function gemPence(cost) { return (cost / GEMINI_LIMIT) * 3; } // display in pence out of 3p
+
 async function callGemini(msgs, sysPrompt, maxTok) {
+    if (loadGemSpend() >= GEMINI_LIMIT) {
+        return 'Error: Free Gemini allowance used up (~3p limit reached). Add your own Claude API key (⚙) to keep chatting.';
+    }
     try {
         const res = await fetch('/api/gemini', {
             method: 'POST',
@@ -822,6 +833,13 @@ async function callGemini(msgs, sysPrompt, maxTok) {
         if (!res.ok) return 'Error: Gemini backend unavailable (' + res.status + '). Is this running on Vercel with Gemini_API set?';
         const d = await res.json();
         if (d.error) return 'Error: ' + d.error;
+        // Track estimated spend from token usage
+        if (d.usage) {
+            const cost = (d.usage.promptTokenCount || 0) / 1e6 * GEMINI_IN_RATE
+                       + (d.usage.candidatesTokenCount || 0) / 1e6 * GEMINI_OUT_RATE;
+            saveGemSpend(loadGemSpend() + cost);
+            applyGeminiUI();
+        }
         return d.text || '(no response)';
     } catch(e) {
         return 'Connection Error: ' + e.message;
@@ -839,9 +857,13 @@ function applyGeminiUI() {
     const state = document.getElementById('geminiState');
     document.body.classList.toggle('gemini-mode', geminiMode);
     if (btn) btn.classList.toggle('on', geminiMode);
-    if (state) state.textContent = geminiMode ? 'on' : 'off';
+    const used = gemPence(loadGemSpend());
+    const capped = loadGemSpend() >= GEMINI_LIMIT;
+    if (state) state.textContent = geminiMode ? (capped ? 'used up' : 'on') : 'off';
     const badge = document.getElementById('modelBadge');
-    if (badge) badge.textContent = geminiMode ? '✦ gemini-2.0-flash (free)' : '▸ ' + model;
+    if (badge) badge.textContent = geminiMode
+        ? '✦ gemini-2.0-flash · ' + used.toFixed(1) + 'p / 3p'
+        : '▸ ' + model;
 }
 
 async function generateChatName(firstMessage) {
