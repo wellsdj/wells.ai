@@ -69,22 +69,22 @@
         font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
         padding: 2px 7px; border-radius: 10px; background: rgba(255,255,255,0.08); color: var(--muted);
     }
-    /* Active (on) state — Google blue */
+    /* Active (on) state — Groq orange */
     .gemini-toggle.on {
-        background: linear-gradient(135deg, #4285F4, #1a73e8);
-        border-color: #4285F4; color: #fff;
-        box-shadow: 0 3px 14px rgba(66,133,244,0.45);
+        background: linear-gradient(135deg, #f97316, #f43f5e);
+        border-color: #f97316; color: #fff;
+        box-shadow: 0 3px 14px rgba(249,115,22,0.45);
     }
     .gemini-toggle.on .gemini-spark { color: #fff; }
     .gemini-toggle.on .gemini-state { background: rgba(255,255,255,0.25); color: #fff; }
 
-    /* When Gemini mode is on, retheme the accent to Google blue */
+    /* When Groq mode is on, retheme the accent to Groq orange */
     body.gemini-mode {
-        --accent: #1a73e8;
+        --accent: #f97316;
     }
-    body.gemini-mode .btn-send { background: linear-gradient(135deg, #4285F4, #1a73e8); }
-    body.gemini-mode .avatar.bot { background: linear-gradient(135deg, #4285F4, #1a73e8); }
-    body.gemini-mode #modelBadge { color: #8ab4f8; }
+    body.gemini-mode .btn-send { background: linear-gradient(135deg, #f97316, #f43f5e); }
+    body.gemini-mode .avatar.bot { background: linear-gradient(135deg, #f97316, #f43f5e); }
+    body.gemini-mode #modelBadge { color: #fdba74; }
 
     /* ═══ EDIT / TODO / THINKING CARDS ═══ */
     .edit-card { border: 1px solid rgba(52,211,153,0.35); background: rgba(16,185,129,0.06); border-radius: 10px; margin: 8px 0; overflow: hidden; }
@@ -328,9 +328,9 @@
     <main class="main" id="mainPanel">
 
         <div class="topbar">
-            <button class="gemini-toggle" id="geminiToggle" onclick="toggleGemini()" title="Use free Gemini (no API key needed)">
-                <span class="gemini-spark">✦</span>
-                <span class="gemini-label">Gemini</span>
+            <button class="gemini-toggle" id="geminiToggle" onclick="toggleGemini()" title="Use free Groq (no API key needed)">
+                <span class="gemini-spark">⚡</span>
+                <span class="gemini-label">Groq</span>
                 <span class="gemini-state" id="geminiState">off</span>
             </button>
         </div>
@@ -806,7 +806,7 @@ async function callAPI(msgs, mdl, maxTok, sysPrompt, opts) {
     opts = opts || {};
     // Gemini mode → route through our serverless proxy (free, no key needed).
     if (geminiMode) return callGemini(msgs, sysPrompt, maxTok);
-    if (!CONFIG.key) return 'Error: API Key missing. Turn on Gemini (top-right) for free use, or click ⚙ to add your Claude key.';
+    if (!CONFIG.key) return 'Error: API Key missing. Turn on Groq (top-right) for free use, or click ⚙ to add your Claude key.';
     try {
         const body = { model: mdl, max_tokens: maxTok, messages: msgs };
         if (sysPrompt) body.system = sysPrompt;
@@ -857,18 +857,18 @@ async function callAPI(msgs, mdl, maxTok, sysPrompt, opts) {
     }
 }
 
-// ── Gemini (free, via /api/gemini serverless proxy) ──
+// ── Groq (free, via /api/gemini serverless proxy — env var holds a Groq key) ──
 // Estimated spend cap so the shared free key can't be run up. ~3 pence ≈ $0.038.
 const GEMINI_LIMIT = 0.038;          // USD (~3p)
-const GEMINI_IN_RATE = 0.10;         // $/1M input tokens  (gemini-2.0-flash)
-const GEMINI_OUT_RATE = 0.40;        // $/1M output tokens
+const GEMINI_IN_RATE = 0.59;         // $/1M input tokens  (llama-3.3-70b on Groq)
+const GEMINI_OUT_RATE = 0.79;        // $/1M output tokens
 function loadGemSpend() { return parseFloat(localStorage.getItem('wai_gem_spend') || '0') || 0; }
 function saveGemSpend(v) { localStorage.setItem('wai_gem_spend', String(v)); }
 function gemPence(cost) { return (cost / GEMINI_LIMIT) * 3; } // display in pence out of 3p
 
 async function callGemini(msgs, sysPrompt, maxTok) {
     if (loadGemSpend() >= GEMINI_LIMIT) {
-        return 'Error: Free Gemini allowance used up (~3p limit reached). Add your own Claude API key (⚙) to keep chatting.';
+        return 'Error: Free Groq allowance used up (~3p limit reached). Add your own Claude API key (⚙) to keep chatting.';
     }
     try {
         const res = await fetch('/api/gemini', {
@@ -876,7 +876,7 @@ async function callGemini(msgs, sysPrompt, maxTok) {
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ messages: msgs, system: sysPrompt, maxTokens: maxTok || 4096 })
         });
-        if (!res.ok) return 'Error: Gemini backend unavailable (' + res.status + '). Is this running on Vercel with Gemini_API set?';
+        if (!res.ok) return 'Error: Groq backend unavailable (' + res.status + '). Is this running on Vercel with Gemini_API set?';
         const d = await res.json();
         if (d.error) return 'Error: ' + d.error;
         // Track estimated spend from token usage
@@ -908,7 +908,7 @@ function applyGeminiUI() {
     if (state) state.textContent = geminiMode ? (capped ? 'used up' : 'on') : 'off';
     const badge = document.getElementById('modelBadge');
     if (badge) badge.textContent = geminiMode
-        ? '✦ gemini-2.0-flash · ' + used.toFixed(1) + 'p / 3p'
+        ? '⚡ llama-3.3-70b (Groq) · ' + used.toFixed(1) + 'p / 3p'
         : '▸ ' + model;
 }
 
@@ -1219,7 +1219,7 @@ document.addEventListener('keydown', e => {
 });
 
 async function doRoast(target) {
-    if (!geminiMode && !CONFIG.key) { alert('Turn on Gemini (top-right) for free use, or add your Claude API key first!'); return; }
+    if (!geminiMode && !CONFIG.key) { alert('Turn on Groq (top-right) for free use, or add your Claude API key first!'); return; }
     const subject = target.trim() || 'the person using this app';
     const reply = await callAPI(
         [{ role: 'user', content: 'Give me a single savage, witty, funny roast of: ' + subject + '. Max 2 sentences. No intro, just the roast. Be brutal but funny, not mean-spirited.' }],
@@ -2436,7 +2436,7 @@ let learnCurrent = 0;
 
 async function doLearn(topic) {
     if (!topic) { alert('Type a topic! e.g. /learn black holes'); return; }
-    if (!geminiMode && !CONFIG.key) { alert('Turn on Gemini (top-right) for free use, or add your Claude API key first!'); return; }
+    if (!geminiMode && !CONFIG.key) { alert('Turn on Groq (top-right) for free use, or add your Claude API key first!'); return; }
 
     document.getElementById('learnOverlay').classList.add('show');
     document.getElementById('learnTopic').textContent = topic;
