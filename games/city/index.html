@@ -49,9 +49,53 @@
   #toast { position: fixed; top: 26%; left: 0; right: 0; text-align: center; font-size: 30px; font-weight: 800; letter-spacing: 1px; color: #fff; z-index: 6; pointer-events: none; opacity: 0; transition: opacity .16s ease, transform .16s ease; text-shadow: 0 3px 18px rgba(10,10,30,.7); }
   @media (prefers-reduced-motion: reduce) { #toast { transition: none; } #menu { transition: none; } }
 
+  #hudNext { font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; opacity: .82; margin-top: 8px; text-shadow: 0 2px 10px rgba(10,10,30,.7); }
+  #hudBest { font-size: 11px; font-weight: 700; letter-spacing: 1px; opacity: .72; margin-top: 3px; text-shadow: 0 2px 10px rgba(10,10,30,.7); font-variant-numeric: tabular-nums; }
+
+  /* persistent home button */
+  #homeBtn {
+    position: fixed; top: 16px; right: 16px; z-index: 9; pointer-events: auto;
+    width: 46px; height: 46px; border: 0; border-radius: 13px; cursor: pointer;
+    background: rgba(255,255,255,.9); box-shadow: 0 5px 16px rgba(20,10,30,.3);
+    font-size: 21px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  }
+  #homeBtn:active { transform: translateY(2px); }
+
+  /* menu layout */
+  #menu { justify-content: flex-end; padding: 0; }
+  #menu .scrim { position: absolute; inset: 0; background: linear-gradient(to top, rgba(20,8,26,.72) 0%, rgba(20,8,26,.28) 34%, rgba(20,8,26,0) 60%); pointer-events: none; }
+  .menu-inner { position: relative; display: flex; flex-direction: column; align-items: center; padding-bottom: 11vh; width: 100%; }
+  #menu .btn { min-width: 220px; }
+  #menu .brand-sub { margin-bottom: 26px; }
+  #menuUnlock { color: #ffe08a; font-weight: 800; min-height: 16px; margin-top: 8px; }
+
   /* game-over: buttons pinned bottom, comparison drawn on canvas above */
   #over { justify-content: flex-end; padding-bottom: 7vh; }
   #over .btnrow { display: flex; flex-direction: column; align-items: center; }
+
+  /* shop */
+  #shop { background: rgba(14,8,22,.55); backdrop-filter: blur(4px); }
+  .shopcard {
+    position: relative; pointer-events: auto; width: min(88vw, 360px);
+    background: rgba(255,255,255,.96); color: #22283a; border-radius: 22px;
+    padding: 26px 22px 22px; box-shadow: 0 30px 80px rgba(10,8,24,.5);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  #shopClose { position: absolute; top: 12px; right: 14px; border: 0; background: none; font-size: 20px; color: #9aa1af; cursor: pointer; pointer-events: auto; }
+  .shoptitle { font-weight: 800; letter-spacing: 3px; text-transform: uppercase; font-size: 15px; color: #6b7180; margin-bottom: 12px; }
+  .shoprow { display: flex; align-items: center; gap: 8px; width: 100%; justify-content: center; }
+  .arrow { pointer-events: auto; cursor: pointer; border: 0; width: 46px; height: 46px; border-radius: 50%; background: #eef0f4; color: #3a4152; font-size: 18px; box-shadow: 0 3px 10px rgba(20,20,40,.14); flex: none; }
+  .arrow:active { transform: translateY(2px); }
+  .arrow:disabled { opacity: .3; cursor: default; }
+  .skinview { display: flex; flex-direction: column; align-items: center; flex: 1; }
+  #shopPreview { width: 200px; height: 220px; }
+  .skinname { font-weight: 800; font-size: 22px; letter-spacing: 1px; margin-top: 2px; }
+  .skinstatus { font-weight: 700; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #8a91a0; margin-top: 3px; }
+  .skinbar { width: 78%; height: 8px; border-radius: 5px; background: #e6e8ee; margin-top: 12px; overflow: hidden; }
+  .skinbar.hide { visibility: hidden; }
+  #skinBarFill { height: 100%; width: 0%; background: linear-gradient(90deg, #ffcf6a, #f6a52e); border-radius: 5px; }
+  #equipBtn { margin-top: 20px; min-width: 200px; }
+  #equipBtn:disabled { opacity: .5; cursor: default; filter: grayscale(.3); }
 </style>
 </head>
 <body>
@@ -61,19 +105,41 @@
   <div id="hudLeft">
     <div id="hudHeight">10 m</div>
     <div id="hudPct">1% of Burj Khalifa</div>
-  </div>
-  <div id="hudRight">
+    <div id="hudNext">Next: Liberty 93 m</div>
     <div id="hudBest">Best 0 m</div>
-    <div id="hudBestPct">0%</div>
   </div>
 </div>
+<button id="homeBtn" aria-label="Home" style="display:none">🏠</button>
 <div id="toast"></div>
 
 <div id="menu" class="ui">
-  <h1 class="brand">CITY</h1>
-  <div class="brand-sub">Build your tower toward the Burj Khalifa</div>
-  <button class="btn" id="playBtn">Play</button>
-  <div class="stat" id="menuBest">Best 0 m</div>
+  <div class="scrim"></div>
+  <div class="menu-inner">
+    <h1 class="brand">CITY</h1>
+    <div class="brand-sub">Build your tower toward the Burj Khalifa</div>
+    <button class="btn" id="playBtn">Play</button>
+    <button class="btn ghost" id="shopBtn">Shop</button>
+    <div class="stat" id="menuStat">Best 0 m · 0 m built</div>
+    <div class="stat" id="menuUnlock"></div>
+  </div>
+</div>
+
+<div id="shop" class="ui hidden">
+  <div class="shopcard">
+    <button id="shopClose" aria-label="Close">✕</button>
+    <div class="shoptitle">Skins</div>
+    <div class="shoprow">
+      <button class="arrow" id="shopPrev" aria-label="Previous">◀</button>
+      <div class="skinview">
+        <canvas id="shopPreview" width="220" height="240"></canvas>
+        <div id="skinName" class="skinname">Azure</div>
+        <div id="skinStatus" class="skinstatus">Equipped</div>
+        <div id="skinBar" class="skinbar"><div id="skinBarFill"></div></div>
+      </div>
+      <button class="arrow" id="shopNext" aria-label="Next">▶</button>
+    </div>
+    <button class="btn" id="equipBtn">Equip</button>
+  </div>
 </div>
 
 <div id="over" class="ui hidden">
@@ -148,6 +214,22 @@ const PERF = 11;                 // perfect tolerance (tighter = harder)
 const BURJ_M = 828;              // Burj Khalifa height, metres
 const BASE_M = 10, STEP_M = 5;   // first floor 10 m, each floor +5 m
 
+// height landmarks shown on the gauge and as the "next" target
+const MARKS = [
+  { m: 93, name: 'Liberty' }, { m: 139, name: 'Pyramid' }, { m: 330, name: 'Eiffel' },
+  { m: 443, name: 'Empire St' }, { m: 828, name: 'Burj' },
+];
+
+// tower skins, unlocked by cumulative metres built across all runs
+const SKINS = [
+  { id: 'azure',    name: 'Azure',    need: 0,     top: '#a9d3e0', right: '#33526b', left: '#2b465c', gA: '#8fc2d6', gB: '#a9d8e8', lit: '#ffe3a1' },
+  { id: 'sunset',   name: 'Sunset',   need: 1000,  top: '#ffd9a8', right: '#8a4a2f', left: '#6f3a25', gA: '#f0a35e', gB: '#f7c07a', lit: '#fff0c0' },
+  { id: 'emerald',  name: 'Emerald',  need: 4000,  top: '#bfe8c8', right: '#2f6b47', left: '#245538', gA: '#4fae7a', gB: '#7fd0a0', lit: '#eaffe0' },
+  { id: 'obsidian', name: 'Obsidian', need: 10000, top: '#5a6470', right: '#1c2430', left: '#131a22', gA: '#2b3a48', gB: '#3d5265', lit: '#86f2ff' },
+  { id: 'aurora',   name: 'Aurora',   need: 25000, mythic: true },
+];
+function skinUnlockCount(total) { let n = 0; for (const s of SKINS) if (total >= s.need) n++; return n; }
+
 // ---------- draw primitives ----------
 function fillQuad(g, a, b, c, d, color) { g.fillStyle = color; g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.lineTo(c.x, c.y); g.lineTo(d.x, d.y); g.closePath(); g.fill(); }
 function faceWin(g, O, U, V, cols, rows, win) {
@@ -221,19 +303,29 @@ function burjPath(g, cx, baseY, hpx) {
 }
 function drawBurj(g, cx, baseY, hpx, fill) { burjPath(g, cx, baseY, hpx); g.fillStyle = fill; g.fill(); }
 
-// left-edge progress gauge during play
+function nextMark(m) { for (const mk of MARKS) if (mk.m > m) return mk; return null; }
+// left-edge progress gauge with landmark milestones
 function drawBurjGauge(g) {
-  const hpx = H * 0.7, baseY = H * 0.9, cx = 42;
+  const hpx = H * 0.7, baseY = H * 0.9, cx = 42, m = heightM();
   drawBurj(g, cx, baseY, hpx, 'rgba(255,255,255,.13)');
-  const frac = clamp(heightM() / BURJ_M, 0, 1), markY = baseY - frac * hpx;
+  const frac = clamp(m / BURJ_M, 0, 1), markY = baseY - frac * hpx;
   g.save(); burjPath(g, cx, baseY, hpx); g.clip();
   g.fillStyle = 'rgba(255,222,150,.92)'; g.fillRect(0, markY, 120, baseY - markY);
   g.restore();
-  g.strokeStyle = 'rgba(255,255,255,.75)'; g.lineWidth = 1.5; g.setLineDash([4, 4]);
-  g.beginPath(); g.moveTo(6, markY); g.lineTo(92, markY); g.stroke(); g.setLineDash([]);
-  g.fillStyle = 'rgba(255,255,255,.85)'; g.textAlign = 'left';
-  g.font = '700 11px Helvetica, Arial'; g.fillText('828 m', 12, baseY - hpx - 6);
-  g.font = '800 12px Helvetica, Arial'; g.fillText(heightM() + ' m', 12, markY - 6);
+  // landmark ticks
+  const nm = nextMark(m);
+  g.textAlign = 'left';
+  for (const mk of MARKS) {
+    const y = baseY - (mk.m / BURJ_M) * hpx, on = m >= mk.m, next = nm && nm.m === mk.m;
+    g.strokeStyle = next ? 'rgba(255,235,150,.95)' : on ? 'rgba(255,255,255,.5)' : 'rgba(255,255,255,.28)';
+    g.lineWidth = next ? 2 : 1; g.beginPath(); g.moveTo(cx + 14, y); g.lineTo(cx + 30, y); g.stroke();
+    g.fillStyle = next ? 'rgba(255,235,150,.95)' : on ? 'rgba(255,255,255,.65)' : 'rgba(255,255,255,.4)';
+    g.font = (next ? '800 ' : '600 ') + '9px Helvetica, Arial'; g.fillText(mk.name, cx + 34, y + 3);
+  }
+  // your marker
+  g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.5; g.setLineDash([4, 4]);
+  g.beginPath(); g.moveTo(6, markY); g.lineTo(cx + 10, markY); g.stroke(); g.setLineDash([]);
+  g.fillStyle = 'rgba(255,255,255,.9)'; g.font = '800 12px Helvetica, Arial'; g.fillText(m + ' m', 10, markY - 6);
 }
 
 // ======================================================================
@@ -244,53 +336,65 @@ function buildHomeCity() {
   if (!homeCanvas) { homeCanvas = document.createElement('canvas'); homeCtx = homeCanvas.getContext('2d'); }
   homeCanvas.width = W; homeCanvas.height = H;
   const g = homeCtx, rnd = mulberry32(99);
-  // warm sky
+  // warm golden-hour sky
   const sky = g.createLinearGradient(0, 0, 0, H);
-  sky.addColorStop(0, '#3a2456'); sky.addColorStop(0.34, '#7e3a63');
-  sky.addColorStop(0.6, '#c85a3c'); sky.addColorStop(0.78, '#ef9a3c'); sky.addColorStop(1, '#f7c664');
+  sky.addColorStop(0, '#241a4a'); sky.addColorStop(0.28, '#5c2c62');
+  sky.addColorStop(0.5, '#a8455a'); sky.addColorStop(0.68, '#e07a38');
+  sky.addColorStop(0.84, '#f5ab41'); sky.addColorStop(1, '#ffd479');
   g.fillStyle = sky; g.fillRect(0, 0, W, H);
-  // sun
-  const sunX = W * 0.5, sunY = H * 0.66;
-  const sg = g.createRadialGradient(sunX, sunY, 6, sunX, sunY, H * 0.55);
-  sg.addColorStop(0, 'rgba(255,244,210,.95)'); sg.addColorStop(0.2, 'rgba(255,210,140,.7)'); sg.addColorStop(1, 'rgba(255,170,110,0)');
+  // sun + bloom low on the horizon
+  const sunX = W * 0.52, sunY = H * 0.7;
+  const sg = g.createRadialGradient(sunX, sunY, 6, sunX, sunY, H * 0.62);
+  sg.addColorStop(0, 'rgba(255,247,220,.98)'); sg.addColorStop(0.16, 'rgba(255,214,150,.8)'); sg.addColorStop(0.5, 'rgba(255,170,110,.25)'); sg.addColorStop(1, 'rgba(255,150,100,0)');
   g.fillStyle = sg; g.fillRect(0, 0, W, H);
-  g.fillStyle = 'rgba(255,248,224,.95)'; g.beginPath(); g.arc(sunX, sunY, H * 0.05, 0, Math.PI * 2); g.fill();
+  // soft volumetric rays
+  g.save(); g.globalCompositeOperation = 'lighter';
+  for (let r = 0; r < 9; r++) {
+    const a = -Math.PI / 2 + (r - 4) * 0.26, len = H * 0.9, wsp = 26 + r % 3 * 10;
+    g.fillStyle = 'rgba(255,226,160,.05)';
+    g.beginPath(); g.moveTo(sunX, sunY);
+    g.lineTo(sunX + Math.cos(a) * len - wsp, sunY + Math.sin(a) * len);
+    g.lineTo(sunX + Math.cos(a) * len + wsp, sunY + Math.sin(a) * len);
+    g.closePath(); g.fill();
+  }
+  g.restore();
+  g.fillStyle = 'rgba(255,250,230,.96)'; g.beginPath(); g.arc(sunX, sunY, H * 0.045, 0, Math.PI * 2); g.fill();
 
-  // building layers back -> front (hazier & warmer in back, darker in front)
+  // building layers, back (hazy gold) -> front (deep warm silhouette)
   const layers = [
-    { y: H * 0.60, hMin: 0.10, hMax: 0.26, col: '#c8734f', haze: 0.55, win: 0.5, wcol: '#ffd98a' },
-    { y: H * 0.66, hMin: 0.14, hMax: 0.34, col: '#9a5142', haze: 0.35, win: 0.7, wcol: '#ffcf7c' },
-    { y: H * 0.74, hMin: 0.18, hMax: 0.46, col: '#5f3446', haze: 0.16, win: 0.9, wcol: '#ffc46a' },
-    { y: H * 0.84, hMin: 0.22, hMax: 0.6, col: '#341f34', haze: 0.05, win: 1.0, wcol: '#ffbf63' },
+    { y: 0.605, hMin: 0.08, hMax: 0.22, col: '#cf7b4e', haze: 0.6, win: 0.45, wcol: '#ffdf96' },
+    { y: 0.665, hMin: 0.12, hMax: 0.32, col: '#a85644', haze: 0.4, win: 0.65, wcol: '#ffd382' },
+    { y: 0.735, hMin: 0.16, hMax: 0.44, col: '#6e3a48', haze: 0.2, win: 0.85, wcol: '#ffc76e' },
+    { y: 0.82, hMin: 0.2, hMax: 0.58, col: '#3c2338', haze: 0.06, win: 1.0, wcol: '#ffbf63' },
   ];
   for (const L of layers) {
-    let x = -30;
-    const base = lerpHex(L.col, '#f2b062', L.haze);
+    let x = -30; const yBase = L.y * H, base = lerpHex(L.col, '#f4b568', L.haze);
     while (x < W + 30) {
-      const bw = 34 + rnd() * 66, bh = (L.hMin + rnd() * (L.hMax - L.hMin)) * H;
-      const bx = x, by = L.y - bh;
-      g.fillStyle = base; g.fillRect(bx, by, bw, bh + H);
-      // top edge highlight (sun-catch)
-      g.fillStyle = lerpHex(base, '#ffe3a6', 0.4); g.fillRect(bx, by, bw, 3);
-      // windows
-      const cols = Math.max(1, Math.floor(bw / 13)), rows = Math.floor(bh / 15);
+      const bw = 30 + rnd() * 70, bh = (L.hMin + rnd() * (L.hMax - L.hMin)) * H, bx = x, by = yBase - bh;
+      // subtle vertical face shading
+      const fg = g.createLinearGradient(bx, 0, bx + bw, 0);
+      fg.addColorStop(0, lerpHex(base, '#ffcf86', 0.14)); fg.addColorStop(1, shade(base, -0.12));
+      g.fillStyle = fg; g.fillRect(bx, by, bw, bh + H);
+      g.fillStyle = lerpHex(base, '#fff0c8', 0.5); g.fillRect(bx, by, bw, 2.5); // sun-catch cap
+      // rooftop bits on nearer layers
+      if (L.haze < 0.25 && rnd() < 0.5) { const rw = 8 + rnd() * 12; g.fillStyle = shade(base, -0.05); g.fillRect(bx + 5 + rnd() * (bw - rw - 8), by - 5, rw, 6); }
+      const cols = Math.max(1, Math.floor(bw / 12)), rows = Math.floor(bh / 14);
       for (let ci = 0; ci < cols; ci++) for (let ri = 0; ri < rows; ri++) {
         if (rnd() < 0.5 * L.win) {
-          g.fillStyle = rnd() < 0.7 ? L.wcol : lerpHex(L.wcol, base, 0.5);
-          g.globalAlpha = 0.55 + rnd() * 0.45;
-          g.fillRect(bx + 4 + ci * 13, by + 6 + ri * 15, 6, 8);
-          g.globalAlpha = 1;
+          g.fillStyle = rnd() < 0.72 ? L.wcol : lerpHex(L.wcol, base, 0.5);
+          g.globalAlpha = 0.5 + rnd() * 0.5; g.fillRect(bx + 4 + ci * 12, by + 6 + ri * 14, 5, 7); g.globalAlpha = 1;
         }
       }
-      x += bw + 5 + rnd() * 8;
+      x += bw + 4 + rnd() * 8;
     }
   }
-  // soft foreground haze + vignette
-  const hz = g.createLinearGradient(0, H * 0.7, 0, H);
-  hz.addColorStop(0, 'rgba(30,16,34,0)'); hz.addColorStop(1, 'rgba(24,12,28,.5)');
-  g.fillStyle = hz; g.fillRect(0, H * 0.7, W, H * 0.3);
-  const vg = g.createRadialGradient(W / 2, H * 0.5, H * 0.3, W / 2, H * 0.5, H * 0.85);
-  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(20,8,24,.4)');
+  // atmospheric haze band along the sun line
+  const hb = g.createLinearGradient(0, H * 0.6, 0, H * 0.78);
+  hb.addColorStop(0, 'rgba(255,200,140,0)'); hb.addColorStop(0.5, 'rgba(255,200,140,.16)'); hb.addColorStop(1, 'rgba(255,200,140,0)');
+  g.fillStyle = hb; g.fillRect(0, H * 0.6, W, H * 0.18);
+  // vignette (bottom scrim is a DOM layer for crisp text)
+  const vg = g.createRadialGradient(W / 2, H * 0.46, H * 0.32, W / 2, H * 0.52, H * 0.92);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(18,7,22,.46)');
   g.fillStyle = vg; g.fillRect(0, 0, W, H);
 }
 
@@ -301,7 +405,10 @@ const S = { MENU: 0, PLAY: 1, DEAD: 2 };
 let state = S.MENU;
 let stack = null, mover = null, debris = [], sparks = [];
 let score = 0, bestM = 0, camY = 0, camYT = 0, shake = 0, usedContinue = false, endT = 0;
+let totalM = 0, equipped = 0, committedM = 0, activeSkin = 0, shopIdx = 0, unlockMsg = '';
 bestM = +(localStorage.getItem('city_best_m') || 0);
+totalM = +(localStorage.getItem('city_total_m') || 0);
+(function loadSkin() { const sid = localStorage.getItem('city_skin'); const i = SKINS.findIndex(s => s.id === sid); if (i >= 0 && totalM >= SKINS[i].need) equipped = i; })();
 
 function heightM() { return BASE_M + STEP_M * score; }
 function pctOfBurj(m) { return Math.round(m / BURJ_M * 100); }
@@ -316,7 +423,7 @@ function reset() {
 function newMover() {
   const top = stack[stack.length - 1];
   const axis = stack.length % 2 === 1 ? 'x' : 'z';
-  const spd = Math.min(300 + score * 9, 700);
+  const spd = Math.min(300 + score * 3.2, 540);
   const w = top.x1 - top.x0, d = top.z1 - top.z0;
   mover = { axis, spd, len: axis === 'x' ? w : d, dir: Math.random() < 0.5 ? 1 : -1, wob: Math.random() * 6 };
   mover.off = mover.dir > 0 ? -430 : 430;
@@ -352,30 +459,49 @@ function drop() {
   camYT = Math.max(0, stack.length * BH - (0.42 * H) / C);
   updateHud(); newMover();
 }
+function commitRun() {
+  const m = heightM(), add = Math.max(0, m - committedM);
+  if (add > 0) {
+    const before = skinUnlockCount(totalM);
+    totalM += add; committedM = m; localStorage.setItem('city_total_m', totalM);
+    const after = skinUnlockCount(totalM);
+    if (after > before) unlockMsg = '✦ New skin unlocked: ' + SKINS[after - 1].name;
+  }
+  if (m > bestM) { bestM = m; localStorage.setItem('city_best_m', bestM); }
+}
 function die() {
   state = S.DEAD; sdkStop(); shake = 10; endT = 0;
-  const m = heightM();
-  if (m > bestM) { bestM = m; localStorage.setItem('city_best_m', bestM); }
+  commitRun();
   const r = moverRect(); debris.push({ ...r, vy: 20, fall: 0 });
   continueBtn.style.display = usedContinue ? 'none' : '';
   overEl.classList.remove('hidden'); hudEl.style.display = 'none';
+}
+function goHome() {
+  if (state === S.PLAY) commitRun();
+  state = S.MENU; sdkStop();
+  overEl.classList.add('hidden'); shopEl.classList.add('hidden'); hudEl.style.display = 'none'; homeBtn.style.display = 'none';
+  menuEl.classList.remove('hidden'); refreshMenu();
 }
 function spawnSparks(b) {
   const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, y = stack.length * BH;
   for (let i = 0; i < 22; i++) { const a = Math.random() * 6.28, r = 40 + Math.random() * 60; sparks.push({ x: cx + Math.cos(a) * r, z: cz + Math.sin(a) * r, y, vy: 130 + Math.random() * 150, life: .5 + Math.random() * .5 }); }
 }
 
-// ---------- floor styling (windows kept) ----------
-function floorColors(i) { return { top: '#a9d3e0', frame: '#33526b', glass: lerpHex('#8fc2d6', '#a9d8e8', (Math.sin(i * .7) + 1) / 2 * .5), lit: '#ffe3a1' }; }
+// ---------- floor styling (windows kept, skin-aware) ----------
+function floorColors(i) {
+  const sk = SKINS[activeSkin];
+  if (sk.mythic) {
+    const h = (i * 16 + performance.now() * 0.045) % 360;
+    return { top: `hsl(${(h + 10) % 360}, 82%, 78%)`, right: `hsl(${h}, 66%, 40%)`, left: `hsl(${h}, 66%, 30%)`, glass: `hsl(${h}, 80%, 62%)`, lit: '#ffffff' };
+  }
+  return { top: sk.top, right: sk.right, left: sk.left, glass: lerpHex(sk.gA, sk.gB, (Math.sin(i * .7) + 1) / 2), lit: sk.lit };
+}
 function drawFloor(g, b, i, yb, yt) {
   const w = b.x1 - b.x0, d = b.z1 - b.z0;
-  if (b.podium) {
-    drawBox(g, b.x0, b.z0, b.x1, b.z1, yb, yt, { top: '#b9b3a6', right: '#8f887b', left: '#7c766a' }, null);
-    return;
-  }
+  if (b.podium) { drawBox(g, b.x0, b.z0, b.x1, b.z1, yb, yt, { top: '#b9b3a6', right: '#8f887b', left: '#7c766a' }, null); return; }
   if (Math.min(w, d) < 76) { drawBox(g, b.x0, b.z0, b.x1, b.z1, yb, yt, { top: '#c6cdd1', right: '#93a3ac', left: '#7d8d97' }, null); return; }
   const c = floorColors(i);
-  drawBox(g, b.x0, b.z0, b.x1, b.z1, yb, yt, { top: c.top, right: c.frame, left: shade(c.frame, -0.1) },
+  drawBox(g, b.x0, b.z0, b.x1, b.z1, yb, yt, { top: c.top, right: c.right, left: c.left },
     { colsR: clamp(Math.round(d / 42), 2, 7), colsL: clamp(Math.round(w / 42), 2, 7), rows: 1, glass: c.glass, lit: c.lit, litP: 0.16, seed: (i * 13) % 999 });
 }
 function floorBaseY(i) { return i === 0 ? 0 : PODIUM_H + (i - 1) * BH; }
@@ -391,30 +517,78 @@ canvas.addEventListener('pointerdown', press, { passive: false });
 window.addEventListener('keydown', press);
 
 // ---------- UI ----------
-const menuEl = document.getElementById('menu'), overEl = document.getElementById('over'), hudEl = document.getElementById('hud');
-const hudHeightEl = document.getElementById('hudHeight'), hudPctEl = document.getElementById('hudPct'), hudBestEl = document.getElementById('hudBest'), hudBestPctEl = document.getElementById('hudBestPct');
-const toastEl = document.getElementById('toast'), continueBtn = document.getElementById('continueBtn');
-document.getElementById('menuBest').textContent = 'Best ' + bestM + ' m';
+const menuEl = document.getElementById('menu'), overEl = document.getElementById('over'), hudEl = document.getElementById('hud'), shopEl = document.getElementById('shop');
+const hudHeightEl = document.getElementById('hudHeight'), hudPctEl = document.getElementById('hudPct'), hudNextEl = document.getElementById('hudNext'), hudBestEl = document.getElementById('hudBest');
+const toastEl = document.getElementById('toast'), continueBtn = document.getElementById('continueBtn'), homeBtn = document.getElementById('homeBtn');
+const menuStatEl = document.getElementById('menuStat'), menuUnlockEl = document.getElementById('menuUnlock');
+function refreshMenu() {
+  menuStatEl.textContent = 'Best ' + bestM + ' m · ' + totalM + ' m built · ' + SKINS[equipped].name;
+  menuUnlockEl.textContent = unlockMsg; unlockMsg = '';
+}
+refreshMenu();
 function updateHud() {
-  const m = heightM();
+  const m = heightM(), nm = nextMark(m);
   hudHeightEl.textContent = m + ' m';
   hudPctEl.textContent = pctOfBurj(m) + '% of Burj Khalifa';
+  hudNextEl.textContent = nm ? 'Next: ' + nm.name + ' ' + nm.m + ' m' : 'Above the Burj!';
   hudBestEl.textContent = 'Best ' + Math.max(bestM, m) + ' m';
-  hudBestPctEl.textContent = pctOfBurj(Math.max(bestM, m)) + '%';
 }
 let toastTimer = 0;
 function toast(msg) { toastEl.textContent = msg; toastEl.style.opacity = 1; toastEl.style.transform = 'scale(1.1)'; clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.style.opacity = 0; toastEl.style.transform = 'scale(1)'; }, 650); }
 function startGame() {
   applyGameScale();
-  reset(); state = S.PLAY; menuEl.classList.add('hidden'); overEl.classList.add('hidden');
-  hudEl.style.display = 'flex'; updateHud(); newMover(); sdkStart();
+  reset(); committedM = 0; state = S.PLAY;
+  menuEl.classList.add('hidden'); overEl.classList.add('hidden'); shopEl.classList.add('hidden');
+  hudEl.style.display = 'flex'; homeBtn.style.display = 'flex'; updateHud(); newMover(); sdkStart();
 }
 document.getElementById('playBtn').addEventListener('click', startGame);
 document.getElementById('retryBtn').addEventListener('click', startGame);
+homeBtn.addEventListener('click', goHome);
 continueBtn.addEventListener('click', () => {
   continueBtn.disabled = true;
-  showRewardedAd(() => { continueBtn.disabled = false; usedContinue = true; state = S.PLAY; applyGameScale(); overEl.classList.add('hidden'); hudEl.style.display = 'flex'; newMover(); sdkStart(); });
+  showRewardedAd(() => { continueBtn.disabled = false; usedContinue = true; state = S.PLAY; applyGameScale(); overEl.classList.add('hidden'); hudEl.style.display = 'flex'; homeBtn.style.display = 'flex'; newMover(); sdkStart(); });
 });
+
+// ---------- shop ----------
+const shopPreview = document.getElementById('shopPreview'), spCtx = shopPreview.getContext('2d');
+const skinNameEl = document.getElementById('skinName'), skinStatusEl = document.getElementById('skinStatus');
+const skinBarEl = document.getElementById('skinBar'), skinBarFillEl = document.getElementById('skinBarFill'), equipBtn = document.getElementById('equipBtn');
+function openShop() { shopIdx = equipped; menuEl.classList.add('hidden'); shopEl.classList.remove('hidden'); renderShop(); }
+function closeShop() { shopEl.classList.add('hidden'); menuEl.classList.remove('hidden'); refreshMenu(); }
+function drawSkinPreview(idx) {
+  const w = shopPreview.width, h = shopPreview.height, g = spCtx;
+  g.clearRect(0, 0, w, h);
+  const bg = g.createLinearGradient(0, 0, 0, h); bg.addColorStop(0, '#e9ecf3'); bg.addColorStop(1, '#cfd5e0');
+  g.fillStyle = bg; g.fillRect(0, 0, w, h);
+  const sA = A, sB = B, sC = C, sPX = PX, sPY = PY, sAct = activeSkin;
+  const stackN = 6, hw = SIZE * 0.34;
+  const worldH = PODIUM_H + (stackN - 1) * BH;
+  const k = (h * 0.66) / worldH; A = k; B = k * 0.577; C = k; PX = w * 0.5; PY = h * 0.86; activeSkin = idx;
+  // soft ground shadow
+  const gs = project(0, 0, 0); g.fillStyle = 'rgba(30,35,55,.16)'; g.beginPath(); g.ellipse(gs.x, gs.y, hw * k * 2.1, hw * k * 0.9, 0, 0, Math.PI * 2); g.fill();
+  const tmp = [{ x0: -hw, z0: -hw, x1: hw, z1: hw, podium: true }];
+  for (let i = 1; i < stackN; i++) tmp.push({ x0: -hw, z0: -hw, x1: hw, z1: hw });
+  for (let i = 0; i < stackN; i++) drawFloor(g, tmp[i], i, floorBaseY(i), floorTopY(i));
+  A = sA; B = sB; C = sC; PX = sPX; PY = sPY; activeSkin = sAct;
+}
+function renderShop() {
+  const sk = SKINS[shopIdx], unlocked = totalM >= sk.need, isEq = shopIdx === equipped;
+  drawSkinPreview(shopIdx);
+  skinNameEl.textContent = sk.name + (sk.mythic ? '  ✦' : '');
+  skinNameEl.style.color = sk.mythic ? '#a05bd6' : '#22283a';
+  skinStatusEl.textContent = isEq ? 'Equipped' : unlocked ? 'Unlocked' : (sk.mythic ? 'Mythic — Locked' : 'Locked');
+  if (unlocked) { skinBarEl.classList.add('hide'); }
+  else { skinBarEl.classList.remove('hide'); skinBarFillEl.style.width = clamp(totalM / sk.need * 100, 0, 100) + '%'; skinStatusEl.textContent = totalM + ' / ' + sk.need + ' m built'; }
+  equipBtn.disabled = !unlocked || isEq;
+  equipBtn.textContent = isEq ? 'Equipped' : unlocked ? 'Equip' : 'Need ' + sk.need + ' m';
+  document.getElementById('shopPrev').disabled = shopIdx === 0;
+  document.getElementById('shopNext').disabled = shopIdx === SKINS.length - 1;
+}
+document.getElementById('shopBtn').addEventListener('click', openShop);
+document.getElementById('shopClose').addEventListener('click', closeShop);
+document.getElementById('shopPrev').addEventListener('click', () => { if (shopIdx > 0) { shopIdx--; renderShop(); } });
+document.getElementById('shopNext').addEventListener('click', () => { if (shopIdx < SKINS.length - 1) { shopIdx++; renderShop(); } });
+equipBtn.addEventListener('click', () => { if (totalM >= SKINS[shopIdx].need) { equipped = shopIdx; localStorage.setItem('city_skin', SKINS[shopIdx].id); renderShop(); } });
 
 // ---------- loop ----------
 let last = performance.now();
@@ -437,6 +611,7 @@ function update(dt, t) {
 
 // ---------- tower render (iso, during play) ----------
 function renderTower(shx, shy) {
+  activeSkin = equipped;
   PX = W / 2 + shx; PY = groundY + camY * C + shy;
   for (const d of debris) { const yb = stack.length * BH - d.fall; drawBox(ctx, d.x0, d.z0, d.x1, d.z1, yb, yb + BH, { top: '#c6cdd1', right: '#9aa7b0', left: '#84919b' }, null); }
   const firstVis = Math.max(0, stack.length - 26);
@@ -492,6 +667,7 @@ function drawFloorOff(g, b, i, ox, oz) {
   drawFloor(g, { x0: b.x0 + ox, z0: b.z0 + oz, x1: b.x1 + ox, z1: b.z1 + oz, podium: b.podium, w: b.w, d: b.d }, i, floorBaseY(i), floorTopY(i));
 }
 function renderComparison() {
+  activeSkin = equipped;
   drawCompSky(ctx);
   const compC = 0.56 * H / (BURJ_M * BH_PER_M);
   const e = easeOut(endT), startMul = 2.6;
