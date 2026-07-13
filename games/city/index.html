@@ -96,6 +96,35 @@
   #skinBarFill { height: 100%; width: 0%; background: linear-gradient(90deg, #ffcf6a, #f6a52e); border-radius: 5px; }
   #equipBtn { margin-top: 20px; min-width: 200px; }
   #equipBtn:disabled { opacity: .5; cursor: default; filter: grayscale(.3); }
+
+  /* stats screen */
+  #stats { background: rgba(14,8,22,.55); backdrop-filter: blur(4px); }
+  .statscard {
+    position: relative; pointer-events: auto; width: min(88vw, 360px);
+    background: rgba(255,255,255,.96); color: #22283a; border-radius: 22px;
+    padding: 26px 22px 22px; box-shadow: 0 30px 80px rgba(10,8,24,.5);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  #statsClose { position: absolute; top: 12px; right: 14px; border: 0; background: none; font-size: 20px; color: #9aa1af; cursor: pointer; pointer-events: auto; }
+  .statstitle { font-weight: 800; letter-spacing: 3px; text-transform: uppercase; font-size: 15px; color: #6b7180; margin-bottom: 16px; }
+  .statsrow { display: flex; align-items: center; gap: 8px; width: 100%; justify-content: center; }
+  .statsmain { display: flex; flex-direction: column; align-items: center; flex: 1; }
+  #statsBestVal { font-weight: 800; font-size: 36px; letter-spacing: 1px; margin-top: 2px; text-align: center; }
+  #statsPctVal { font-weight: 700; font-size: 16px; letter-spacing: 1px; margin-top: 12px; color: #8a91a0; }
+  .statsmark { display: flex; flex-direction: column; align-items: center; margin-top: 16px; padding-top: 16px; border-top: 1px solid #e6e8ee; width: 100%; }
+  .statsmarkname { font-weight: 800; font-size: 14px; letter-spacing: 1px; text-transform: uppercase; color: #6b7180; }
+  .statsmarkval { font-weight: 600; font-size: 24px; margin-top: 6px; color: #22283a; }
+  .statsmarktype { font-weight: 600; font-size: 11px; letter-spacing: 0.5px; color: #8a91a0; margin-top: 4px; text-transform: uppercase; }
+
+  /* home screen tutorial */
+  #tutorialText {
+    position: fixed; bottom: 20px; left: 20px; z-index: 8; pointer-events: none;
+    color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.5px;
+    text-transform: uppercase; opacity: .85; text-shadow: 0 2px 8px rgba(10,10,30,.6);
+    display: none;
+  }
+  #tutorialText.visible { display: block; }
+  #tutorialEye { font-size: 16px; margin-right: 6px; }
 </style>
 </head>
 <body>
@@ -109,7 +138,7 @@
     <div id="hudBest">Best 0 m</div>
   </div>
 </div>
-<button id="homeBtn" aria-label="Home" style="display:none">🏠</button>
+<button id="homeBtn" aria-label="Home" style="display:none">⌂</button>
 <div id="toast"></div>
 
 <div id="menu" class="ui">
@@ -119,6 +148,7 @@
     <div class="brand-sub">Build your tower toward the Burj Khalifa</div>
     <button class="btn" id="playBtn">Play</button>
     <button class="btn ghost" id="shopBtn">Shop</button>
+    <button class="btn ghost" id="statsBtn">Stats</button>
     <div class="stat" id="menuStat">Best 0 m · 0 m built</div>
     <div class="stat" id="menuUnlock"></div>
   </div>
@@ -142,11 +172,35 @@
   </div>
 </div>
 
+<div id="stats" class="ui hidden">
+  <div class="statscard">
+    <button id="statsClose" aria-label="Close">✕</button>
+    <div class="statstitle">Stats</div>
+    <div class="statsrow">
+      <button class="arrow" id="statsPrev" aria-label="Previous">◀</button>
+      <div class="statsmain">
+        <div id="statsBestVal">0 m</div>
+        <div id="statsPctVal">0% of Burj Khalifa</div>
+        <div class="statsmark">
+          <div class="statsmarkname" id="statsMarkName">Liberty</div>
+          <div class="statsmarkval" id="statsMarkVal">0 m</div>
+          <div class="statsmarktype" id="statsMarkType">best / worst</div>
+        </div>
+      </div>
+      <button class="arrow" id="statsNext" aria-label="Next">▶</button>
+    </div>
+  </div>
+</div>
+
 <div id="over" class="ui hidden">
   <div class="btnrow">
     <button class="btn" id="continueBtn">▲ Recover my building (Ad)</button>
     <button class="btn ghost" id="retryBtn">New building</button>
   </div>
+</div>
+
+<div id="tutorialText">
+  <span id="tutorialEye">👁</span>How to play
 </div>
 
 <script>
@@ -405,10 +459,12 @@ const S = { MENU: 0, PLAY: 1, DEAD: 2 };
 let state = S.MENU;
 let stack = null, mover = null, debris = [], sparks = [];
 let score = 0, bestM = 0, camY = 0, camYT = 0, shake = 0, usedContinue = false, endT = 0;
-let totalM = 0, equipped = 0, committedM = 0, activeSkin = 0, shopIdx = 0, unlockMsg = '';
+let totalM = 0, equipped = 0, committedM = 0, activeSkin = 0, shopIdx = 0, statsIdx = 0, unlockMsg = '';
+let milestoneRecords = {};  // { markName: { best: m, worst: m } }
 bestM = +(localStorage.getItem('city_best_m') || 0);
 totalM = +(localStorage.getItem('city_total_m') || 0);
 (function loadSkin() { const sid = localStorage.getItem('city_skin'); const i = SKINS.findIndex(s => s.id === sid); if (i >= 0 && totalM >= SKINS[i].need) equipped = i; })();
+(function loadMilestoneRecords() { const stored = localStorage.getItem('city_milestone_records'); if (stored) { try { milestoneRecords = JSON.parse(stored); } catch (e) {} } })();
 
 function heightM() { return BASE_M + STEP_M * score; }
 function pctOfBurj(m) { return Math.round(m / BURJ_M * 100); }
@@ -468,6 +524,19 @@ function commitRun() {
     if (after > before) unlockMsg = '✦ New skin unlocked: ' + SKINS[after - 1].name;
   }
   if (m > bestM) { bestM = m; localStorage.setItem('city_best_m', bestM); }
+  // update milestone records
+  for (const mk of MARKS) {
+    if (!milestoneRecords[mk.name]) milestoneRecords[mk.name] = { best: 0, worst: 0 };
+    if (m >= mk.m) {
+      if (milestoneRecords[mk.name].best === 0) milestoneRecords[mk.name].best = m;
+      else milestoneRecords[mk.name].best = Math.max(milestoneRecords[mk.name].best, m);
+    }
+    if (m < mk.m) {
+      if (milestoneRecords[mk.name].worst === 0) milestoneRecords[mk.name].worst = m;
+      else milestoneRecords[mk.name].worst = Math.min(milestoneRecords[mk.name].worst, m);
+    }
+  }
+  localStorage.setItem('city_milestone_records', JSON.stringify(milestoneRecords));
 }
 function die() {
   state = S.DEAD; sdkStop(); shake = 10; endT = 0;
@@ -479,8 +548,8 @@ function die() {
 function goHome() {
   if (state === S.PLAY) commitRun();
   state = S.MENU; sdkStop();
-  overEl.classList.add('hidden'); shopEl.classList.add('hidden'); hudEl.style.display = 'none'; homeBtn.style.display = 'none';
-  menuEl.classList.remove('hidden'); refreshMenu();
+  overEl.classList.add('hidden'); shopEl.classList.add('hidden'); statsEl.classList.add('hidden'); hudEl.style.display = 'none'; homeBtn.style.display = 'none';
+  menuEl.classList.remove('hidden'); tutorialEl.classList.add('visible'); refreshMenu();
 }
 function spawnSparks(b) {
   const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, y = stack.length * BH;
@@ -538,7 +607,8 @@ function toast(msg) { toastEl.textContent = msg; toastEl.style.opacity = 1; toas
 function startGame() {
   applyGameScale();
   reset(); committedM = 0; state = S.PLAY;
-  menuEl.classList.add('hidden'); overEl.classList.add('hidden'); shopEl.classList.add('hidden');
+  menuEl.classList.add('hidden'); overEl.classList.add('hidden'); shopEl.classList.add('hidden'); statsEl.classList.add('hidden');
+  tutorialEl.classList.remove('visible');
   hudEl.style.display = 'flex'; homeBtn.style.display = 'flex'; updateHud(); newMover(); sdkStart();
 }
 document.getElementById('playBtn').addEventListener('click', startGame);
@@ -546,15 +616,30 @@ document.getElementById('retryBtn').addEventListener('click', startGame);
 homeBtn.addEventListener('click', goHome);
 continueBtn.addEventListener('click', () => {
   continueBtn.disabled = true;
-  showRewardedAd(() => { continueBtn.disabled = false; usedContinue = true; state = S.PLAY; applyGameScale(); overEl.classList.add('hidden'); hudEl.style.display = 'flex'; homeBtn.style.display = 'flex'; newMover(); sdkStart(); });
+  showRewardedAd(() => {
+    continueBtn.disabled = false;
+    usedContinue = true;
+    // remove last 5 blocks (or all if fewer than 5)
+    const removeCount = Math.min(5, Math.max(0, stack.length - 1));  // keep at least podium
+    for (let i = 0; i < removeCount; i++) stack.pop();
+    score = Math.max(0, stack.length - 1);
+    state = S.PLAY;
+    applyGameScale();
+    overEl.classList.add('hidden');
+    hudEl.style.display = 'flex';
+    homeBtn.style.display = 'flex';
+    updateHud();
+    newMover();
+    sdkStart();
+  });
 });
 
 // ---------- shop ----------
 const shopPreview = document.getElementById('shopPreview'), spCtx = shopPreview.getContext('2d');
 const skinNameEl = document.getElementById('skinName'), skinStatusEl = document.getElementById('skinStatus');
 const skinBarEl = document.getElementById('skinBar'), skinBarFillEl = document.getElementById('skinBarFill'), equipBtn = document.getElementById('equipBtn');
-function openShop() { shopIdx = equipped; menuEl.classList.add('hidden'); shopEl.classList.remove('hidden'); renderShop(); }
-function closeShop() { shopEl.classList.add('hidden'); menuEl.classList.remove('hidden'); refreshMenu(); }
+function openShop() { shopIdx = equipped; menuEl.classList.add('hidden'); tutorialEl.classList.remove('visible'); shopEl.classList.remove('hidden'); renderShop(); }
+function closeShop() { shopEl.classList.add('hidden'); menuEl.classList.remove('hidden'); tutorialEl.classList.add('visible'); refreshMenu(); }
 function drawSkinPreview(idx) {
   const w = shopPreview.width, h = shopPreview.height, g = spCtx;
   g.clearRect(0, 0, w, h);
@@ -590,7 +675,43 @@ document.getElementById('shopPrev').addEventListener('click', () => { if (shopId
 document.getElementById('shopNext').addEventListener('click', () => { if (shopIdx < SKINS.length - 1) { shopIdx++; renderShop(); } });
 equipBtn.addEventListener('click', () => { if (totalM >= SKINS[shopIdx].need) { equipped = shopIdx; localStorage.setItem('city_skin', SKINS[shopIdx].id); renderShop(); } });
 
+// ---------- stats ----------
+const statsEl = document.getElementById('stats');
+const statsBestEl = document.getElementById('statsBestVal'), statsPctEl = document.getElementById('statsPctVal');
+const statsMarkEl = document.getElementById('statsMarkName'), statsValEl = document.getElementById('statsMarkVal'), statsTypeEl = document.getElementById('statsMarkType');
+function openStats() { statsIdx = 0; menuEl.classList.add('hidden'); tutorialEl.classList.remove('visible'); statsEl.classList.remove('hidden'); renderStats(); }
+function closeStats() { statsEl.classList.add('hidden'); menuEl.classList.remove('hidden'); tutorialEl.classList.add('visible'); refreshMenu(); }
+function renderStats() {
+  const mk = MARKS[statsIdx];
+  statsBestEl.textContent = bestM + ' m';
+  statsPctEl.textContent = pctOfBurj(bestM) + '% of Burj Khalifa';
+  statsMarkEl.textContent = mk.name;
+  const rec = milestoneRecords[mk.name];
+  if (rec && (rec.best > 0 || rec.worst > 0)) {
+    if (rec.best > 0 && rec.worst > 0) {
+      statsValEl.textContent = rec.best + ' m / ' + rec.worst + ' m';
+      statsTypeEl.textContent = 'best / worst';
+    } else if (rec.best > 0) {
+      statsValEl.textContent = rec.best + ' m';
+      statsTypeEl.textContent = 'best';
+    } else {
+      statsValEl.textContent = rec.worst + ' m';
+      statsTypeEl.textContent = 'worst';
+    }
+  } else {
+    statsValEl.textContent = '— m';
+    statsTypeEl.textContent = 'no record';
+  }
+  document.getElementById('statsPrev').disabled = statsIdx === 0;
+  document.getElementById('statsNext').disabled = statsIdx === MARKS.length - 1;
+}
+document.getElementById('statsBtn').addEventListener('click', openStats);
+document.getElementById('statsClose').addEventListener('click', closeStats);
+document.getElementById('statsPrev').addEventListener('click', () => { if (statsIdx > 0) { statsIdx--; renderStats(); } });
+document.getElementById('statsNext').addEventListener('click', () => { if (statsIdx < MARKS.length - 1) { statsIdx++; renderStats(); } });
+
 // ---------- loop ----------
+const tutorialEl = document.getElementById('tutorialText');
 let last = performance.now();
 function loop(now) { const dt = Math.min((now - last) / 1000, 0.05); last = now; update(dt, now / 1000); render(now / 1000); requestAnimationFrame(loop); }
 function update(dt, t) {
@@ -712,6 +833,7 @@ function render(t) {
 // ---------- boot ----------
 resize();
 reset();
+tutorialEl.classList.add('visible');
 requestAnimationFrame(loop);
 </script>
 </body>
