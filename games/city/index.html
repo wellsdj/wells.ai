@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>City</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #bfe0f0; touch-action: manipulation;
+    font-family: 'Helvetica Neue', 'Arial', system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  #game { display: block; width: 100vw; height: 100vh; }
+
+  .ui {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    color: #23303a; pointer-events: none; z-index: 10;
+  }
+  .ui.hidden { display: none; }
+
+  #menu { justify-content: flex-end; padding-bottom: 12vh; }
+  .brand {
+    font-weight: 800; font-size: clamp(58px, 17vw, 140px); line-height: .9;
+    letter-spacing: 8px; margin: 0; color: #fbfdff;
+    text-shadow: 0 2px 0 rgba(40,70,95,.25), 0 14px 40px rgba(30,60,90,.35);
+  }
+  .brand-sub {
+    font-weight: 600; letter-spacing: 3px; text-transform: uppercase;
+    font-size: clamp(11px, 3vw, 14px); color: #fbfdff; opacity: .92;
+    margin: 14px 0 30px; text-shadow: 0 2px 12px rgba(20,50,80,.5);
+  }
+  .btn {
+    pointer-events: auto; cursor: pointer; border: 0; border-radius: 10px;
+    padding: 17px 60px; font-size: 19px; font-weight: 800; letter-spacing: 2px;
+    font-family: inherit; color: #1c2a35; text-transform: uppercase;
+    background: linear-gradient(180deg, #ffd874, #f5b524);
+    box-shadow: 0 8px 22px rgba(190,130,20,.4), inset 0 1px 0 rgba(255,255,255,.5);
+    margin: 7px; transition: transform .1s ease, box-shadow .1s ease;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 4px 14px rgba(190,130,20,.4); }
+  .btn.ghost {
+    background: rgba(255,255,255,.9); color: #26333d;
+    box-shadow: 0 8px 22px rgba(40,70,95,.22), inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  .stat {
+    font-weight: 700; font-size: 14px; letter-spacing: 1px; margin-top: 22px;
+    color: #fbfdff; opacity: .9; text-shadow: 0 2px 10px rgba(20,50,80,.5);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* game-over card */
+  #over .card {
+    background: rgba(255,255,255,.94); border-radius: 20px; padding: 34px 40px;
+    box-shadow: 0 30px 80px rgba(30,55,80,.35); backdrop-filter: blur(6px);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  #over .lbl { font-weight: 700; letter-spacing: 3px; text-transform: uppercase; font-size: 12px; color: #8a97a1; }
+  #bigScore { font-size: clamp(66px, 17vw, 118px); font-weight: 800; margin: 2px 0 0; color: #1f2c36; line-height: 1; font-variant-numeric: tabular-nums; }
+  #overSub { font-weight: 600; font-size: 15px; color: #667581; margin: 6px 0 24px; font-variant-numeric: tabular-nums; }
+
+  /* HUD */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 18px 20px; pointer-events: none; color: #fbfdff;
+  }
+  #hudLeft { display: flex; flex-direction: column; line-height: 1; }
+  #hudFloors { font-size: 58px; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 3px 14px rgba(20,50,80,.5); }
+  #hudFloorsLbl { font-size: 12px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; opacity: .9; margin-top: 2px; text-shadow: 0 2px 8px rgba(20,50,80,.6); }
+  #hudRight { text-align: right; font-weight: 700; font-size: 14px; letter-spacing: 1px; opacity: .95; line-height: 1.6; text-shadow: 0 2px 8px rgba(20,50,80,.55); font-variant-numeric: tabular-nums; }
+
+  #toast {
+    position: fixed; top: 30%; left: 0; right: 0; text-align: center;
+    font-size: 30px; font-weight: 800; letter-spacing: 1px; color: #fff;
+    z-index: 6; pointer-events: none; opacity: 0;
+    transition: opacity .18s ease, transform .18s ease;
+    text-shadow: 0 3px 18px rgba(20,50,80,.6);
+  }
+  @media (prefers-reduced-motion: reduce) { #toast { transition: none; } }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" style="display:none">
+  <div id="hudLeft">
+    <div id="hudFloors">0</div>
+    <div id="hudFloorsLbl">Floors</div>
+  </div>
+  <div id="hudRight">
+    <div id="hudHeight">0 m</div>
+    <div id="hudBest">Best 0</div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<div id="menu" class="ui">
+  <h1 class="brand">CITY</h1>
+  <div class="brand-sub">Raise the tallest tower on the skyline</div>
+  <button class="btn" id="playBtn">Start</button>
+  <div class="stat" id="menuBest">Best 0 floors</div>
+</div>
+
+<div id="over" class="ui hidden">
+  <div class="card">
+    <div class="lbl">Topped out at</div>
+    <div id="bigScore">0</div>
+    <div id="overSub">floors · best 0</div>
+    <button class="btn" id="continueBtn">▲ Recover my building (Ad)</button>
+    <button class="btn ghost" id="retryBtn">New building</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+// ======================================================================
+// CITY — build a skyscraper floor by floor above a living isometric town.
+// One tap drops a floor. Big floors get glass window facades; thin
+// sliver cuts become plain steel setback bands. No flips, no power-ups —
+// just height. Recover a toppled build with a rewarded ad.
+// ======================================================================
+
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+// ---- projection scale (px per world unit); rescaled to viewport ----
+const BASE_A = 0.52, BASE_B = 0.30, BASE_C = 0.52;
+let A = BASE_A, B = BASE_B, C = BASE_C;
+let W = 0, H = 0, DPR = 1, groundY = 0, lastS = -1;
+
+let PX = 0, PY = 0; // projection origin, swapped between city-canvas and live passes
+function project(x, y, z) { return { x: PX + (x - z) * A, y: PY + (x + z) * B - y * C }; }
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  groundY = H * 0.60;
+  const S = Math.max(0.72, Math.min(1.4, Math.min(W, H) / 720));
+  if (Math.abs(S - lastS) > 0.02) {
+    lastS = S; A = BASE_A * S; B = BASE_B * S; C = BASE_C * S;
+    if (cityReady) buildCity(); // reproject the static scene
+  }
+}
+window.addEventListener('resize', resize);
+
+// ---------- CrazyGames SDK (graceful fallback) ----------
+let cgSdk = null;
+(function initSdk() {
+  const s = document.createElement('script');
+  s.src = 'https://sdk.crazygames.com/crazygames-sdk-v3.js';
+  s.onload = async () => { try { await window.CrazyGames.SDK.init(); cgSdk = window.CrazyGames.SDK; } catch (e) {} };
+  s.onerror = () => {};
+  document.head.appendChild(s);
+})();
+function sdkStart() { try { cgSdk && cgSdk.game.gameplayStart(); } catch (e) {} }
+function sdkStop()  { try { cgSdk && cgSdk.game.gameplayStop(); } catch (e) {} }
+function showRewardedAd(cb) {
+  if (cgSdk) { try { cgSdk.ad.requestAd('rewarded', { adFinished: cb, adError: () => cb() }); return; } catch (e) {} }
+  setTimeout(cb, 800);
+}
+
+// ---------- math / color ----------
+function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+function sub(a, b) { return { x: a.x - b.x, y: a.y - b.y }; }
+function add(a, b) { return { x: a.x + b.x, y: a.y + b.y }; }
+function mul(a, s) { return { x: a.x * s, y: a.y * s }; }
+function hexRgb(h) { h = h.replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; }
+function rgbHex(r, g, b) { return '#' + [r, g, b].map(v => clamp(Math.round(v), 0, 255).toString(16).padStart(2, '0')).join(''); }
+function shade(hex, amt) { const [r, g, b] = hexRgb(hex); const t = amt < 0 ? 0 : 255, p = Math.abs(amt); return rgbHex(r + (t - r) * p, g + (t - g) * p, b + (t - b) * p); }
+function lerpHex(h1, h2, t) { const a = hexRgb(h1), b = hexRgb(h2); return rgbHex(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t); }
+function hash3(a, b, c) { const x = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453; return x - Math.floor(x); }
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+// ---------- world constants ----------
+const HORIZON = '#eadfca';
+const SIZE = 300;     // tower footprint (world units)
+const BH = 56;        // floor height
+const PODIUM_H = 78;
+const LOT = 300, STREET = 78, HALF = 4; // 9x9 grid
+const EXT = (HALF + 0.5) * LOT + STREET;
+const E2 = 2 * ((HALF + 0.5) * LOT);    // for haze normalisation
+const PLAZA_R = 1;    // lots within Chebyshev radius 1 are open plaza
+const BLD_PAL = ['#cec6b7', '#c68f70', '#a2b4af', '#93a2b6', '#baa993', '#aab2a2', '#d3c7b4', '#9fae b6'.replace(' ', '')];
+const TREE_PAL = ['#7fa86b', '#8fb87a', '#6f9a5d'];
+
+// ---------- draw primitives ----------
+function fillQuad(g, a, b, c, d, color) {
+  g.fillStyle = color; g.beginPath();
+  g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.lineTo(c.x, c.y); g.lineTo(d.x, d.y);
+  g.closePath(); g.fill();
+}
+function faceWin(g, O, U, V, cols, rows, win) {
+  const fm = 0.17;
+  for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+    const u0 = (i + fm) / cols, u1 = (i + 1 - fm) / cols, v0 = (j + fm) / rows, v1 = (j + 1 - fm) / rows;
+    const a = add(add(O, mul(U, u0)), mul(V, v0));
+    const b = add(add(O, mul(U, u1)), mul(V, v0));
+    const c = add(add(O, mul(U, u1)), mul(V, v1));
+    const d = add(add(O, mul(U, u0)), mul(V, v1));
+    g.fillStyle = hash3(win.seed, i, j) < win.litP ? win.lit : win.glass;
+    g.beginPath(); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.lineTo(c.x, c.y); g.lineTo(d.x, d.y); g.closePath(); g.fill();
+  }
+}
+// draws an axis-aligned box [x0,x1]x[z0,z1], y in [yb,yt]
+function drawBox(g, x0, z0, x1, z1, yb, yt, col, win) {
+  const tBB = project(x0, yt, z0), tRB = project(x1, yt, z0), tRF = project(x1, yt, z1), tLF = project(x0, yt, z1);
+  const bRB = project(x1, yb, z0), bRF = project(x1, yb, z1), bLF = project(x0, yb, z1);
+  fillQuad(g, tBB, tRB, tRF, tLF, col.top);      // top
+  fillQuad(g, tRB, tRF, bRF, bRB, col.right);    // right (+x)
+  fillQuad(g, tLF, tRF, bRF, bLF, col.left);     // left  (+z)
+  if (win) {
+    faceWin(g, tRB, sub(tRF, tRB), sub(bRB, tRB), win.colsR, win.rows, win); // right face
+    faceWin(g, tRF, sub(tLF, tRF), sub(bRF, tRF), win.colsL, win.rows, win); // left face
+  }
+  // crisp corner seam for definition
+  g.strokeStyle = 'rgba(30,45,60,.14)'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(tRF.x, tRF.y); g.lineTo(bRF.x, bRF.y); g.stroke();
+}
+
+// ======================================================================
+//  STATIC CITY  — pre-rendered once into an offscreen canvas
+// ======================================================================
+let cityCanvas = null, cityCtx = null, CPX0 = 0, CPY0 = 0, cityReady = false;
+let buildings = [], benches = [], trees = [];
+
+function generateLayout() {
+  const rnd = mulberry32(20260713);
+  buildings = []; benches = []; trees = [];
+  for (let i = -HALF; i <= HALF; i++) for (let j = -HALF; j <= HALF; j++) {
+    const cx = i * LOT, cz = j * LOT;
+    const plaza = Math.max(Math.abs(i), Math.abs(j)) <= PLAZA_R;
+    if (plaza) continue;
+    const bh = clamp(190 + rnd() * 470 + (rnd() < 0.16 ? 300 : 0), 190, 900);
+    const hw = 96, hd = 96;
+    buildings.push({
+      x0: cx - hw, x1: cx + hw, z0: cz - hd, z1: cz + hd, h: bh,
+      sum: cx + cz, mat: BLD_PAL[(Math.floor(rnd() * BLD_PAL.length))],
+      seed: Math.floor(rnd() * 9999),
+      rows: clamp(Math.round(bh / 68), 3, 14),
+      colsR: clamp(Math.round((2 * hd) / 46), 2, 5),
+      colsL: clamp(Math.round((2 * hw) / 46), 2, 5),
+    });
+  }
+  // plaza props around the ring, clear of the tower footprint
+  const ring = 330;
+  for (let k = 0; k < 8; k++) {
+    const ang = k / 8 * Math.PI * 2 + 0.4;
+    const x = Math.cos(ang) * ring, z = Math.sin(ang) * ring;
+    if (k % 2 === 0) benches.push({ x, z, rot: ang });
+    else trees.push({ x, z, s: 0.9 + (k % 3) * 0.14 });
+  }
+  trees.push({ x: -430, z: 430, s: 1.15 }, { x: 430, z: -430, s: 1.05 }, { x: 430, z: 430, s: 1.2 }, { x: -430, z: -430, s: 1.0 });
+}
+
+function hazeOf(sum) { return clamp((E2 - sum) / (2 * E2), 0, 1) * 0.55; }
+
+function drawBuilding(g, b) {
+  const hz = hazeOf(b.sum);
+  const top = lerpHex(shade(b.mat, 0.16), HORIZON, hz);
+  const frame = lerpHex(shade(b.mat, -0.34), HORIZON, hz);
+  const left = lerpHex(shade(b.mat, -0.44), HORIZON, hz);
+  const glass = lerpHex('#b4cdd9', HORIZON, hz * 0.8);
+  drawBox(g, b.x0, b.z0, b.x1, b.z1, 0, b.h,
+    { top, right: frame, left }, { colsR: b.colsR, colsL: b.colsL, rows: b.rows, glass, lit: '#ffe6ab', litP: 0.09, seed: b.seed });
+}
+
+function drawBench(g, bn) {
+  const w = 78, d = 26, sy = 22;
+  drawBox(g, bn.x - w / 2, bn.z - d / 2, bn.x + w / 2, bn.z + d / 2, sy - 6, sy, { top: '#a9743f', right: '#8a5c30', left: '#79502a' }, null);
+  drawBox(g, bn.x - w / 2, bn.z + d / 2 - 6, bn.x + w / 2, bn.z + d / 2, sy, sy + 26, { top: '#8a5c30', right: '#8a5c30', left: '#734b28' }, null);
+}
+function drawTree(g, tr) {
+  const th = 44 * tr.s;
+  drawBox(g, tr.x - 7, tr.z - 7, tr.x + 7, tr.z + 7, 0, th, { top: '#6b4a2e', right: '#5c3f28', left: '#4d3421' }, null);
+  const c = project(tr.x, th + 34 * tr.s, tr.z), r = 40 * tr.s;
+  const puffs = [[0, 0, 1], [-0.55, 0.15, .72], [0.55, 0.12, .72], [0, -0.4, .7]];
+  for (const [dx, dy, s] of puffs) {
+    g.fillStyle = TREE_PAL[(Math.abs(Math.round(dx * 3 + dy * 5))) % TREE_PAL.length];
+    g.beginPath(); g.ellipse(c.x + dx * r, c.y + dy * r, r * s, r * s * 0.82, 0, 0, Math.PI * 2); g.fill();
+  }
+}
+function drawPad(g, cx, cz, plaza) {
+  const h = (LOT - STREET) / 2;
+  const col = plaza ? '#dcd3c3' : '#c7bdb1';
+  const a = project(cx - h, 0, cz - h), b = project(cx + h, 0, cz - h), c = project(cx + h, 0, cz + h), d = project(cx - h, 0, cz + h);
+  fillQuad(g, a, b, c, d, col);
+  if (plaza) { // subtle tile grid
+    g.strokeStyle = 'rgba(120,110,95,.18)'; g.lineWidth = 1;
+    for (let t = 1; t < 4; t++) {
+      const p1 = project(cx - h + (2 * h) * t / 4, 0, cz - h), p2 = project(cx - h + (2 * h) * t / 4, 0, cz + h);
+      const q1 = project(cx - h, 0, cz - h + (2 * h) * t / 4), q2 = project(cx + h, 0, cz - h + (2 * h) * t / 4);
+      g.beginPath(); g.moveTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.moveTo(q1.x, q1.y); g.lineTo(q2.x, q2.y); g.stroke();
+    }
+  } else {
+    // soft contact shadow under the building
+    const s = project(cx, 0, cz);
+    const gr = g.createRadialGradient(s.x, s.y, 4, s.x, s.y, h * A * 1.6);
+    gr.addColorStop(0, 'rgba(40,45,55,.16)'); gr.addColorStop(1, 'rgba(40,45,55,0)');
+    g.fillStyle = gr; g.beginPath(); g.ellipse(s.x, s.y, h * A * 1.5, h * A * 0.8, 0, 0, Math.PI * 2); g.fill();
+  }
+}
+
+function buildCity() {
+  generateLayout();
+  // measure screen bounds over ground corners + tallest tops
+  const pts = [];
+  const g0 = [-EXT, EXT];
+  PX = 0; PY = 0;
+  for (const gx of g0) for (const gz of g0) pts.push(project(gx, 0, gz));
+  for (const b of buildings) pts.push(project((b.x0 + b.x1) / 2, b.h, (b.z0 + b.z1) / 2));
+  let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+  for (const p of pts) { minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x); minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y); }
+  const M = 40;
+  CPX0 = M - minX; CPY0 = M - minY;
+  const cw = Math.ceil(maxX - minX + M * 2), ch = Math.ceil(maxY - minY + M * 2);
+  if (!cityCanvas) { cityCanvas = document.createElement('canvas'); cityCtx = cityCanvas.getContext('2d'); }
+  cityCanvas.width = cw; cityCanvas.height = ch;
+  const g = cityCtx;
+  g.clearRect(0, 0, cw, ch);
+  PX = CPX0; PY = CPY0;
+
+  // asphalt ground
+  const gp = [project(-EXT, 0, -EXT), project(EXT, 0, -EXT), project(EXT, 0, EXT), project(-EXT, 0, EXT)];
+  fillQuad(g, gp[0], gp[1], gp[2], gp[3], '#6f6b68');
+  // faded lane dashes on the two central cross-streets
+  g.strokeStyle = 'rgba(230,210,130,.5)'; g.lineWidth = 3; g.setLineDash([16, 20]);
+  for (const gl of [-0.5 * LOT, 0.5 * LOT]) {
+    let p1 = project(-EXT, 1, gl), p2 = project(EXT, 1, gl);
+    g.beginPath(); g.moveTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.stroke();
+    p1 = project(gl, 1, -EXT); p2 = project(gl, 1, EXT);
+    g.beginPath(); g.moveTo(p1.x, p1.y); g.lineTo(p2.x, p2.y); g.stroke();
+  }
+  g.setLineDash([]);
+
+  // depth-sorted lots (pads, buildings, plaza props) back-to-front
+  const items = [];
+  for (let i = -HALF; i <= HALF; i++) for (let j = -HALF; j <= HALF; j++)
+    items.push({ sum: i * LOT + j * LOT, i, j });
+  items.sort((a, b) => a.sum - b.sum);
+  for (const it of items) {
+    const cx = it.i * LOT, cz = it.j * LOT;
+    const plaza = Math.max(Math.abs(it.i), Math.abs(it.j)) <= PLAZA_R;
+    drawPad(g, cx, cz, plaza);
+  }
+  // props + buildings sorted together by depth
+  const tall = [];
+  for (const b of buildings) tall.push({ sum: b.sum, kind: 'b', o: b });
+  for (const bn of benches) tall.push({ sum: bn.x + bn.z, kind: 'bench', o: bn });
+  for (const tr of trees) tall.push({ sum: tr.x + tr.z, kind: 'tree', o: tr });
+  tall.sort((a, b) => a.sum - b.sum);
+  for (const t of tall) {
+    if (t.kind === 'b') drawBuilding(g, t.o);
+    else if (t.kind === 'bench') drawBench(g, t.o);
+    else drawTree(g, t.o);
+  }
+  cityReady = true;
+}
+
+// ======================================================================
+//  DYNAMIC AGENTS  — cars, people, clouds
+// ======================================================================
+let cars = [], people = [], clouds = [];
+function spawnAgents() {
+  const rnd = mulberry32(7);
+  cars = [];
+  const carCols = ['#d95f52', '#4f7fbf', '#e6b84c', '#e9e6df', '#5aa16b', '#8a8f96'];
+  const lines = [-1.5, -0.5, 0.5, 1.5];
+  for (let k = 0; k < 9; k++) {
+    const axis = rnd() < 0.5 ? 'x' : 'z';
+    const fixed = lines[Math.floor(rnd() * lines.length)] * LOT;
+    cars.push({ axis, fixed, pos: (rnd() * 2 - 1) * EXT, dir: rnd() < 0.5 ? 1 : -1, spd: 70 + rnd() * 50, col: carCols[k % carCols.length] });
+  }
+  people = [];
+  const coats = ['#c85b5b', '#4f7fae', '#e0b24a', '#5a9d6b', '#b07cc0', '#e2ded6', '#3f4a55'];
+  for (let k = 0; k < 30; k++) {
+    const r = 200 + rnd() * 230, ang = rnd() * Math.PI * 2;
+    people.push({ x: Math.cos(ang) * r, z: Math.sin(ang) * r, vx: (rnd() - .5) * 22, vz: (rnd() - .5) * 22, col: coats[k % coats.length], ph: rnd() * 6.28 });
+  }
+  clouds = [];
+  for (let k = 0; k < 6; k++) clouds.push({ x: rnd(), y: 0.05 + rnd() * 0.32, s: 0.7 + rnd() * 0.8, v: 0.004 + rnd() * 0.006 });
+}
+function updateAgents(dt, t) {
+  for (const c of cars) { c.pos += c.dir * c.spd * dt; if (c.pos > EXT) c.pos = -EXT; if (c.pos < -EXT) c.pos = EXT; }
+  for (const p of people) {
+    p.x += p.vx * dt; p.z += p.vz * dt;
+    const r = Math.hypot(p.x, p.z);
+    if (r > 440) { p.vx -= p.x / r * 12 * dt; p.vz -= p.z / r * 12 * dt; }
+    if (r < 170) { p.vx += p.x / r * 14 * dt; p.vz += p.z / r * 14 * dt; }
+    if (Math.random() < 0.01) { p.vx += (Math.random() - .5) * 8; p.vz += (Math.random() - .5) * 8; }
+    const sp = Math.hypot(p.vx, p.vz); if (sp > 26) { p.vx *= 26 / sp; p.vz *= 26 / sp; }
+  }
+  for (const cl of clouds) { cl.x += cl.v * dt * 6; if (cl.x > 1.25) cl.x -= 1.5; }
+}
+function drawCar(g, c) {
+  const x = c.axis === 'x' ? c.pos : c.fixed, z = c.axis === 'x' ? c.fixed : c.pos;
+  const L = c.axis === 'x' ? 92 : 48, D = c.axis === 'x' ? 48 : 92;
+  const s = project(x, 0, z);
+  g.fillStyle = 'rgba(30,35,45,.2)'; g.beginPath(); g.ellipse(s.x, s.y + 3, L * A * 0.62, D * A * 0.4, 0, 0, Math.PI * 2); g.fill();
+  drawBox(g, x - L / 2, z - D / 2, x + L / 2, z + D / 2, 4, 30, { top: shade(c.col, .12), right: shade(c.col, -.16), left: shade(c.col, -.28) }, null);
+  drawBox(g, x - L * 0.3, z - D * 0.3, x + L * 0.3, z + D * 0.3, 30, 46, { top: shade(c.col, .2), right: '#2b3540', left: '#222c36' }, null);
+}
+function drawPerson(g, p, t) {
+  const s = project(p.x, 0, p.z);
+  const bob = Math.sin(t * 6 + p.ph) * 1.2;
+  g.fillStyle = 'rgba(30,35,45,.22)'; g.beginPath(); g.ellipse(s.x, s.y, 6, 3, 0, 0, Math.PI * 2); g.fill();
+  g.fillStyle = p.col; // body
+  g.beginPath(); g.roundRect(s.x - 3.4, s.y - 15 + bob, 6.8, 13, 3); g.fill();
+  g.fillStyle = '#e8c9a8'; // head
+  g.beginPath(); g.arc(s.x, s.y - 17 + bob, 3.4, 0, Math.PI * 2); g.fill();
+}
+
+// ======================================================================
+//  GAME
+// ======================================================================
+const S = { MENU: 0, PLAY: 1, DEAD: 2 };
+let state = S.MENU;
+let stack = null, mover = null, debris = [], sparks = [];
+let score = 0, best = 0, camY = 0, camYT = 0, shake = 0, usedContinue = false;
+best = +(localStorage.getItem('city_best') || 0);
+
+function reset() {
+  const hw = SIZE / 2;
+  stack = [{ x0: -hw, z0: -hw, x1: hw, z1: hw, podium: true }];
+  debris = []; sparks = [];
+  score = 0; camY = 0; camYT = 0; shake = 0; usedContinue = false;
+  mover = null;
+}
+function newMover() {
+  const top = stack[stack.length - 1];
+  const axis = stack.length % 2 === 1 ? 'x' : 'z';
+  const spd = Math.min(230 + score * 7, 560);
+  mover = { axis, spd, x0: top.x0, z0: top.z0, x1: top.x1, z1: top.z1, pos: -1, dir: 1, wob: Math.random() * 6 };
+  const w = top.x1 - top.x0, d = top.z1 - top.z0;
+  mover.len = axis === 'x' ? w : d;
+  mover.off = -420; mover.dir = Math.random() < 0.5 ? 1 : -1; mover.off = mover.dir > 0 ? -420 : 420;
+}
+function moverRect() {
+  const top = stack[stack.length - 1];
+  if (mover.axis === 'x') { const cx = mover.off; return { x0: cx - mover.len / 2, x1: cx + mover.len / 2, z0: top.z0, z1: top.z1 }; }
+  const cz = mover.off; return { x0: top.x0, x1: top.x1, z0: cz - mover.len / 2, z1: cz + mover.len / 2 };
+}
+
+function drop() {
+  const top = stack[stack.length - 1];
+  const r = moverRect();
+  const ax = mover.axis;
+  const mLo = ax === 'x' ? r.x0 : r.z0, mHi = ax === 'x' ? r.x1 : r.z1;
+  const tLo = ax === 'x' ? top.x0 : top.z0, tHi = ax === 'x' ? top.x1 : top.z1;
+  const lo = Math.max(mLo, tLo), hi = Math.min(mHi, tHi);
+  const overlap = hi - lo;
+  if (overlap <= 0) return die();
+
+  const offset = Math.abs((mLo + mHi) / 2 - (tLo + tHi) / 2);
+  const perfect = offset <= 9;
+  const block = { x0: r.x0, z0: r.z0, x1: r.x1, z1: r.z1 };
+  if (perfect) {
+    if (ax === 'x') { block.x0 = tLo; block.x1 = tHi; } else { block.z0 = tLo; block.z1 = tHi; }
+    // regrow toward full width on perfect drops, like the original stacker
+    const grow = 16;
+    if (ax === 'x') { const cur = block.x1 - block.x0; if (cur < SIZE) { const ng = Math.min(SIZE, cur + grow), cx = (block.x0 + block.x1) / 2; block.x0 = cx - ng / 2; block.x1 = cx + ng / 2; } }
+    else { const cur = block.z1 - block.z0; if (cur < SIZE) { const ng = Math.min(SIZE, cur + grow), cz = (block.z0 + block.z1) / 2; block.z0 = cz - ng / 2; block.z1 = cz + ng / 2; } }
+    spawnSparks(block);
+    shake = 5; toast('PERFECT');
+  } else {
+    // shed the overhang as tumbling debris
+    const cutLo = mLo < tLo, cut = mLo < tLo ? (tLo - mLo) : (mHi - tHi);
+    if (cut > 1) {
+      const d = { x0: r.x0, z0: r.z0, x1: r.x1, z1: r.z1, vy: 40, fall: 0, rot: 0, vr: (Math.random() - .5) * 5 };
+      if (ax === 'x') { if (cutLo) d.x1 = tLo; else d.x0 = tHi; } else { if (cutLo) d.z1 = tLo; else d.z0 = tHi; }
+      debris.push(d);
+    }
+    if (ax === 'x') { block.x0 = lo; block.x1 = hi; } else { block.z0 = lo; block.z1 = hi; }
+  }
+  stack.push(block);
+  score++;
+  camYT = Math.max(0, stack.length * BH - (0.34 * H) / C);
+  updateHud();
+  newMover();
+}
+function die() {
+  state = S.DEAD; sdkStop();
+  if (score > best) { best = score; localStorage.setItem('city_best', best); }
+  const r = moverRect();
+  debris.push({ ...r, vy: 20, fall: 0, rot: 0, vr: (Math.random() - .5) * 4 });
+  bigScoreEl.textContent = score;
+  overSubEl.textContent = 'floors · best ' + best;
+  continueBtn.style.display = usedContinue ? 'none' : '';
+  overEl.classList.remove('hidden'); hudEl.style.display = 'none';
+}
+function spawnSparks(b) {
+  const cx = (b.x0 + b.x1) / 2, cz = (b.z0 + b.z1) / 2, y = stack.length * BH;
+  for (let i = 0; i < 22; i++) { const a = Math.random() * 6.28; sparks.push({ x: cx + Math.cos(a) * 60, z: cz + Math.sin(a) * 60, y, vy: 120 + Math.random() * 120, life: .6 + Math.random() * .4 }); }
+}
+
+// ---------- floor styling ----------
+function floorColors(i) {
+  const wob = Math.sin(i * 0.9) * 4;
+  return { top: shade('#a9d3e0', wob / 100 + .04), right: '#6fa6bd', left: '#5a8ea3', frame: '#33526b', glass: lerpHex('#8fc2d6', '#a9d8e8', (Math.sin(i * .7) + 1) / 2 * .5), lit: '#ffe3a1' };
+}
+function drawFloor(g, b, i, yb, yt) {
+  const w = b.x1 - b.x0, d = b.z1 - b.z0;
+  if (b.podium) { // stone base with an entrance
+    drawBox(g, b.x0, b.z0, b.x1, b.z1, yb, yt, { top: '#b9b3a6', right: '#8f887b', left: '#7c766a' }, null);
+    const e = project((b.x0 + b.x1) / 2, yb, b.z1), e2 = project((b.x0 + b.x1) / 2, yb + 34, b.z1);
+    g.fillStyle = '#3c4650'; g.beginPath();
+    g.moveTo(e.x - 16, e.y); g.lineTo(e.x + 16, e.y); g.lineTo(e2.x + 16, e2.y); g.lineTo(e2.x - 16, e2.y); g.closePath(); g.fill();
+    return;
+  }
+  const sliver = Math.min(w, d) < 76;
+  const c = floorColors(i);
+  if (sliver) { // plain steel setback band
+    drawBox(g, b.x0, b.z0, b.x1, b.z1, yb, yt, { top: '#c6cdd1', right: '#93a3ac', left: '#7d8d97' }, null);
+  } else {
+    drawBox(g, b.x0, b.z0, b.x1, b.z1, yb, yt, { top: c.top, right: c.frame, left: shade(c.frame, -0.1) },
+      { colsR: clamp(Math.round(d / 42), 2, 7), colsL: clamp(Math.round(w / 42), 2, 7), rows: 1, glass: c.glass, lit: c.lit, litP: 0.14, seed: (i * 13) % 999 });
+  }
+}
+
+// ---------- input ----------
+function press(e) {
+  if (e && e.type === 'keydown' && e.code !== 'Space') return;
+  if (e) e.preventDefault();
+  if (state === S.PLAY) drop();
+}
+canvas.addEventListener('pointerdown', press);
+window.addEventListener('keydown', press);
+
+// ---------- UI ----------
+const menuEl = document.getElementById('menu'), overEl = document.getElementById('over'), hudEl = document.getElementById('hud');
+const hudFloorsEl = document.getElementById('hudFloors'), hudHeightEl = document.getElementById('hudHeight'), hudBestEl = document.getElementById('hudBest');
+const bigScoreEl = document.getElementById('bigScore'), overSubEl = document.getElementById('overSub'), continueBtn = document.getElementById('continueBtn');
+const toastEl = document.getElementById('toast');
+document.getElementById('menuBest').textContent = 'Best ' + best + ' floors';
+function updateHud() {
+  hudFloorsEl.textContent = score;
+  hudHeightEl.textContent = (score * 4) + ' m';
+  hudBestEl.textContent = 'Best ' + Math.max(best, score);
+}
+let toastTimer = 0;
+function toast(msg) {
+  toastEl.textContent = msg; toastEl.style.opacity = 1; toastEl.style.transform = 'scale(1.1)';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { toastEl.style.opacity = 0; toastEl.style.transform = 'scale(1)'; }, 700);
+}
+function startGame() {
+  reset(); state = S.PLAY; menuEl.classList.add('hidden'); overEl.classList.add('hidden');
+  hudEl.style.display = 'flex'; updateHud(); newMover(); sdkStart();
+}
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+continueBtn.addEventListener('click', () => {
+  continueBtn.disabled = true;
+  showRewardedAd(() => {
+    continueBtn.disabled = false; usedContinue = true; state = S.PLAY;
+    overEl.classList.add('hidden'); hudEl.style.display = 'flex'; newMover(); sdkStart();
+  });
+});
+
+// ---------- loop ----------
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05); last = now;
+  update(dt, now / 1000); render(now / 1000);
+  requestAnimationFrame(loop);
+}
+function update(dt, t) {
+  camY += (camYT - camY) * Math.min(1, dt * 5);
+  if (shake > 0) shake = Math.max(0, shake - dt * 26);
+  updateAgents(dt, t);
+  if (state === S.PLAY && mover) {
+    const wob = 1 + 0.2 * Math.sin(t * 2 + mover.wob);
+    mover.off += mover.dir * mover.spd * wob * dt;
+    if (mover.off < -420) { mover.off = -420; mover.dir = 1; }
+    if (mover.off > 420) { mover.off = 420; mover.dir = -1; }
+  }
+  for (const d of debris) { d.vy += 1400 * dt; d.fall += d.vy * dt; d.rot += d.vr * dt; }
+  debris = debris.filter(d => d.fall < 3000);
+  for (const p of sparks) { p.y += p.vy * dt; p.vy -= 300 * dt; p.life -= dt; }
+  sparks = sparks.filter(p => p.life > 0);
+}
+
+function drawClouds(g, t) {
+  for (const cl of clouds) {
+    const cx = cl.x * (W + 300) - 150, cy = cl.y * H;
+    const r = 60 * cl.s;
+    g.save();
+    for (const [dx, dy, s] of [[0, 0, 1], [-1, .2, .7], [1, .25, .7], [.4, -.4, .6], [-.5, -.3, .55]]) {
+      const gr = g.createRadialGradient(cx + dx * r, cy + dy * r, 2, cx + dx * r, cy + dy * r, r * s);
+      gr.addColorStop(0, 'rgba(255,255,255,.92)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+      g.fillStyle = gr; g.beginPath(); g.ellipse(cx + dx * r, cy + dy * r, r * s, r * s * 0.7, 0, 0, Math.PI * 2); g.fill();
+    }
+    g.restore();
+  }
+}
+
+function render(t) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // sky
+  const sky = ctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#7bb8e6'); sky.addColorStop(0.5, '#a8d2ec'); sky.addColorStop(0.8, '#d6e8ec'); sky.addColorStop(1, HORIZON);
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+  // soft sun glow
+  const sg = ctx.createRadialGradient(W * 0.72, H * 0.16, 8, W * 0.72, H * 0.16, H * 0.5);
+  sg.addColorStop(0, 'rgba(255,247,224,.75)'); sg.addColorStop(1, 'rgba(255,247,224,0)');
+  ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+  drawClouds(ctx, t);
+  if (!cityReady) return;
+
+  const shx = (Math.random() - .5) * shake, shy = (Math.random() - .5) * shake;
+  // city blit (moves with camera)
+  const destX = (W / 2 + shx) - CPX0, destY = (groundY + camY * C + shy) - CPY0;
+  ctx.drawImage(cityCanvas, destX, destY);
+
+  // live pass origin
+  PX = W / 2 + shx; PY = groundY + camY * C + shy;
+
+  // cars + people (on top of the static city)
+  for (const c of cars) drawCar(ctx, c);
+  for (const p of people) drawPerson(ctx, p, t);
+
+  // debris (falling cut pieces)
+  for (const d of debris) {
+    const yb = stack.length * BH - d.fall;
+    drawBox(ctx, d.x0, d.z0, d.x1, d.z1, yb, yb + BH, { top: '#c6cdd1', right: '#9aa7b0', left: '#84919b' }, null);
+  }
+
+  // the tower (bottom-up); cull floors well below the viewport
+  const firstVis = Math.max(0, stack.length - 26);
+  let yb = firstVis === 0 ? 0 : stack[0] && firstVis * BH;
+  // compute base y for firstVis: podium occupies [0, PODIUM_H], floors each BH above
+  for (let i = firstVis; i < stack.length; i++) {
+    const b = stack[i];
+    const base = i === 0 ? 0 : PODIUM_H + (i - 1) * BH;
+    const topY = i === 0 ? PODIUM_H : base + BH;
+    drawFloor(ctx, b, i, base, topY);
+  }
+  // the moving floor
+  if (state === S.PLAY && mover) {
+    const r = moverRect();
+    const base = PODIUM_H + (stack.length - 1) * BH;
+    drawFloor(ctx, r, stack.length, base, base + BH);
+    // guide posts on the target edges
+    const top = stack[stack.length - 1];
+    ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([5, 6]);
+    ctx.beginPath();
+    const yT = PODIUM_H + (stack.length - 1) * BH;
+    if (mover.axis === 'x') {
+      let p = project(top.x0, yT, (top.z0 + top.z1) / 2), q = project(top.x0, yT + BH, (top.z0 + top.z1) / 2);
+      ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+      p = project(top.x1, yT, (top.z0 + top.z1) / 2); q = project(top.x1, yT + BH, (top.z0 + top.z1) / 2);
+      ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+    } else {
+      let p = project((top.x0 + top.x1) / 2, yT, top.z0), q = project((top.x0 + top.x1) / 2, yT + BH, top.z0);
+      ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+      p = project((top.x0 + top.x1) / 2, yT, top.z1); q = project((top.x0 + top.x1) / 2, yT + BH, top.z1);
+      ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y);
+    }
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // sparks
+  for (const p of sparks) {
+    const s = project(p.x, p.y, p.z);
+    ctx.globalAlpha = Math.max(p.life, 0); ctx.fillStyle = '#fff0c2';
+    ctx.fillRect(s.x - 2, s.y - 2, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+
+  // gentle vignette for depth
+  const vg = ctx.createRadialGradient(W / 2, H * 0.45, H * 0.3, W / 2, H * 0.5, H * 0.9);
+  vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(20,35,55,.14)');
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+}
+
+// ---------- boot ----------
+resize();
+buildCity();
+spawnAgents();
+reset();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
