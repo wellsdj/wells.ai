@@ -234,6 +234,21 @@ function applyGameScale() {
 }
 window.addEventListener('resize', resize);
 
+// ---------- audio effects ----------
+let audioPlace = null, audioDeath = null, audioNav = null, audioSkin = null;
+function initAudio() {
+  audioPlace = new Audio('sfx-place.mp3');
+  audioDeath = new Audio('sfx-death.mp3');
+  audioNav = new Audio('sfx-nav.mp3');
+  audioSkin = new Audio('sfx-skin.mp3');
+  audioPlace.volume = 0.4;
+  audioDeath.volume = 0.2;
+  audioNav.volume = 0.3;
+  audioSkin.volume = 0.4;
+}
+function playSfx(audio) { if (audio) { audio.currentTime = 0; audio.play().catch(() => {}); } }
+initAudio();
+
 // ---------- CrazyGames SDK (graceful fallback) ----------
 let cgSdk = null;
 (function initSdk() {
@@ -513,6 +528,7 @@ function drop() {
   block.w = block.x1 - block.x0; block.d = block.z1 - block.z0;
   stack.push(block); score++;
   camYT = Math.max(0, stack.length * BH - (0.42 * H) / C);
+  playSfx(audioPlace);
   updateHud(); newMover();
 }
 function commitRun() {
@@ -521,7 +537,7 @@ function commitRun() {
     const before = skinUnlockCount(totalM);
     totalM += add; committedM = m; localStorage.setItem('city_total_m', totalM);
     const after = skinUnlockCount(totalM);
-    if (after > before) unlockMsg = '✦ New skin unlocked: ' + SKINS[after - 1].name;
+    if (after > before) { unlockMsg = '✦ New skin unlocked: ' + SKINS[after - 1].name; playSfx(audioSkin); }
   }
   if (m > bestM) { bestM = m; localStorage.setItem('city_best_m', bestM); }
   // update milestone records
@@ -542,6 +558,7 @@ function die() {
   state = S.DEAD; sdkStop(); shake = 10; endT = 0;
   commitRun();
   const r = moverRect(); debris.push({ ...r, vy: 20, fall: 0 });
+  playSfx(audioDeath);
   continueBtn.style.display = usedContinue ? 'none' : '';
   overEl.classList.remove('hidden'); hudEl.style.display = 'none';
 }
@@ -611,10 +628,11 @@ function startGame() {
   tutorialEl.classList.remove('visible');
   hudEl.style.display = 'flex'; homeBtn.style.display = 'flex'; updateHud(); newMover(); sdkStart();
 }
-document.getElementById('playBtn').addEventListener('click', startGame);
-document.getElementById('retryBtn').addEventListener('click', startGame);
-homeBtn.addEventListener('click', goHome);
+document.getElementById('playBtn').addEventListener('click', (e) => { playSfx(audioNav); startGame(); });
+document.getElementById('retryBtn').addEventListener('click', (e) => { playSfx(audioNav); startGame(); });
+homeBtn.addEventListener('click', (e) => { playSfx(audioNav); goHome(); });
 continueBtn.addEventListener('click', () => {
+  playSfx(audioNav);
   continueBtn.disabled = true;
   showRewardedAd(() => {
     continueBtn.disabled = false;
@@ -669,11 +687,11 @@ function renderShop() {
   document.getElementById('shopPrev').disabled = shopIdx === 0;
   document.getElementById('shopNext').disabled = shopIdx === SKINS.length - 1;
 }
-document.getElementById('shopBtn').addEventListener('click', openShop);
-document.getElementById('shopClose').addEventListener('click', closeShop);
-document.getElementById('shopPrev').addEventListener('click', () => { if (shopIdx > 0) { shopIdx--; renderShop(); } });
-document.getElementById('shopNext').addEventListener('click', () => { if (shopIdx < SKINS.length - 1) { shopIdx++; renderShop(); } });
-equipBtn.addEventListener('click', () => { if (totalM >= SKINS[shopIdx].need) { equipped = shopIdx; localStorage.setItem('city_skin', SKINS[shopIdx].id); renderShop(); } });
+document.getElementById('shopBtn').addEventListener('click', (e) => { playSfx(audioNav); openShop(); });
+document.getElementById('shopClose').addEventListener('click', (e) => { playSfx(audioNav); closeShop(); });
+document.getElementById('shopPrev').addEventListener('click', () => { playSfx(audioNav); if (shopIdx > 0) { shopIdx--; renderShop(); } });
+document.getElementById('shopNext').addEventListener('click', () => { playSfx(audioNav); if (shopIdx < SKINS.length - 1) { shopIdx++; renderShop(); } });
+equipBtn.addEventListener('click', () => { if (totalM >= SKINS[shopIdx].need) { equipped = shopIdx; localStorage.setItem('city_skin', SKINS[shopIdx].id); playSfx(audioSkin); renderShop(); } });
 
 // ---------- stats ----------
 const statsEl = document.getElementById('stats');
@@ -705,10 +723,10 @@ function renderStats() {
   document.getElementById('statsPrev').disabled = statsIdx === 0;
   document.getElementById('statsNext').disabled = statsIdx === MARKS.length - 1;
 }
-document.getElementById('statsBtn').addEventListener('click', openStats);
-document.getElementById('statsClose').addEventListener('click', closeStats);
-document.getElementById('statsPrev').addEventListener('click', () => { if (statsIdx > 0) { statsIdx--; renderStats(); } });
-document.getElementById('statsNext').addEventListener('click', () => { if (statsIdx < MARKS.length - 1) { statsIdx++; renderStats(); } });
+document.getElementById('statsBtn').addEventListener('click', (e) => { playSfx(audioNav); openStats(); });
+document.getElementById('statsClose').addEventListener('click', (e) => { playSfx(audioNav); closeStats(); });
+document.getElementById('statsPrev').addEventListener('click', () => { playSfx(audioNav); if (statsIdx > 0) { statsIdx--; renderStats(); } });
+document.getElementById('statsNext').addEventListener('click', () => { playSfx(audioNav); if (statsIdx < MARKS.length - 1) { statsIdx++; renderStats(); } });
 
 // ---------- loop ----------
 const tutorialEl = document.getElementById('tutorialText');
