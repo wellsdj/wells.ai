@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>FlipStack</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #0b0e1a; touch-action: manipulation;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    -webkit-user-select: none; user-select: none;
+  }
+  #game { display: block; width: 100vw; height: 100vh; }
+  .ui {
+    position: fixed; inset: 0; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center;
+    color: #fff; pointer-events: none; z-index: 10;
+  }
+  .ui.hidden { display: none; }
+  .ui h1 {
+    font-size: clamp(42px, 10vw, 84px); margin: 0 0 8px;
+    letter-spacing: 2px; font-weight: 800;
+    background: linear-gradient(135deg, #7df9ff, #ff6ec7, #ffd166);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 4px 24px rgba(125,249,255,.35));
+  }
+  .ui .tag { opacity: .85; font-size: clamp(14px, 3vw, 18px); margin-bottom: 28px; }
+  .ui .tag b { color: #ffd166; }
+  .btn {
+    pointer-events: auto; cursor: pointer; border: 0; border-radius: 14px;
+    padding: 16px 44px; font-size: 20px; font-weight: 700; color: #0b0e1a;
+    background: linear-gradient(135deg, #7df9ff, #58d5ff);
+    box-shadow: 0 6px 30px rgba(125,249,255,.45); margin: 6px;
+    transition: transform .12s ease;
+  }
+  .btn:active { transform: scale(.95); }
+  .btn.alt { background: linear-gradient(135deg, #ffd166, #ff9e5e); box-shadow: 0 6px 30px rgba(255,209,102,.4); }
+  .stat { font-size: 16px; opacity: .8; margin-top: 18px; }
+  #bigScore { font-size: clamp(60px, 14vw, 120px); font-weight: 800; margin: 0; }
+  #overSub { font-size: 18px; opacity: .85; margin: 6px 0 24px; }
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 5;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 14px 18px; color: #fff; pointer-events: none;
+    font-weight: 700;
+  }
+  #hudScore { font-size: 44px; text-shadow: 0 2px 12px rgba(0,0,0,.5); }
+  #hudRight { text-align: right; font-size: 15px; opacity: .9; line-height: 1.5; }
+  #combo {
+    position: fixed; top: 22%; left: 0; right: 0; text-align: center;
+    font-size: 30px; font-weight: 800; color: #ffd166; z-index: 6;
+    pointer-events: none; opacity: 0; transition: opacity .2s, transform .2s;
+    text-shadow: 0 2px 16px rgba(255,209,102,.6);
+  }
+  #flipWarn {
+    position: fixed; bottom: 16%; left: 0; right: 0; text-align: center;
+    font-size: 24px; font-weight: 800; color: #ff6ec7; z-index: 6;
+    pointer-events: none; opacity: 0; letter-spacing: 3px;
+    text-shadow: 0 0 20px rgba(255,110,199,.8);
+  }
+  .pulse { animation: pulse .5s ease infinite alternate; opacity: 1 !important; }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.12); } }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden" style="display:none">
+  <div id="hudScore">0</div>
+  <div id="hudRight">
+    <div id="hudBest">BEST 0</div>
+    <div id="hudCoins">🪙 0</div>
+    <div id="hudFlip">FLIP IN 5</div>
+  </div>
+</div>
+<div id="combo"></div>
+<div id="flipWarn">⚠ WORLD FLIP ⚠</div>
+
+<div id="menu" class="ui">
+  <h1>FLIPSTACK</h1>
+  <div class="tag">Stack the blocks. Survive the <b>world flips</b>.<br>
+  The tower sways… and up high, blocks turn <b>phantom</b>.</div>
+  <button class="btn" id="playBtn">PLAY</button>
+  <div class="stat" id="menuBest">Best: 0</div>
+</div>
+
+<div id="over" class="ui hidden">
+  <p id="bigScore">0</p>
+  <p id="overSub">Best: 0</p>
+  <button class="btn alt" id="continueBtn">▶ SAVE MY TOWER (AD)</button>
+  <button class="btn" id="retryBtn">RETRY</button>
+</div>
+
+<script>
+'use strict';
+// ============================================================
+// FlipStack — stack game with world flips, tower sway, phantoms
+// ============================================================
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+}
+window.addEventListener('resize', resize); resize();
+
+// ---------- CrazyGames SDK (graceful fallback) ----------
+let cgSdk = null;
+(function initSdk() {
+  const s = document.createElement('script');
+  s.src = 'https://sdk.crazygames.com/crazygames-sdk-v3.js';
+  s.onload = async () => {
+    try { await window.CrazyGames.SDK.init(); cgSdk = window.CrazyGames.SDK; } catch (e) {}
+  };
+  s.onerror = () => {};
+  document.head.appendChild(s);
+})();
+function sdkGameplayStart() { try { cgSdk && cgSdk.game.gameplayStart(); } catch (e) {} }
+function sdkGameplayStop()  { try { cgSdk && cgSdk.game.gameplayStop(); } catch (e) {} }
+function showRewardedAd(onReward) {
+  if (cgSdk) {
+    try {
+      cgSdk.ad.requestAd('rewarded', {
+        adFinished: onReward,
+        adError: () => onReward(), // don't punish player if ad fails
+      });
+      return;
+    } catch (e) {}
+  }
+  // Fallback outside the platform: short fake delay
+  setTimeout(onReward, 800);
+}
+
+// ---------- Tuning ----------
+const BLOCK_H = 34;              // block height (world units = px)
+const BASE_W_FRAC = 0.42;        // starting block width as fraction of min(W,650)
+const FLIP_EVERY = 5;            // placements between world flips
+const FLIP_TIME = 0.65;          // seconds for the 180° rotation
+const PERFECT_PX = 7;            // tolerance for a "perfect" drop
+const REGROW = 12;               // px width regained on 3+ combo
+const PHANTOM_START = 12;        // height where flicker begins
+const SWAY_START = 6;            // height where sway begins
+const SPEED0 = 260, SPEED_GAIN = 9, SPEED_MAX = 620;
+
+// ---------- State ----------
+const S = { MENU: 0, PLAY: 1, DEAD: 2 };
+let state = S.MENU;
+let stack = null, mover = null, debris = [], particles = [];
+let score = 0, combo = 0, coins, best;
+let flipCount = 0, flipT = 0, flipped = false, flipAnim = 0;
+let camY = 0, camYT = 0, shake = 0, phantomT = 0, t0 = 0;
+let usedContinue = false, swayPhase = 0, hueBase = 210;
+
+best = +(localStorage.getItem('flipstack_best') || 0);
+coins = +(localStorage.getItem('flipstack_coins') || 0);
+
+function baseWidth() { return Math.min(W, 650) * BASE_W_FRAC; }
+
+function reset() {
+  const bw = baseWidth();
+  stack = [{ x: W / 2 - bw / 2, w: bw }]; // base slab
+  debris = []; particles = [];
+  score = 0; combo = 0;
+  flipCount = 0; flipT = 0; flipped = false; flipAnim = 0;
+  camY = 0; camYT = 0; shake = 0; phantomT = 0; t0 = performance.now();
+  usedContinue = false; swayPhase = Math.random() * 10;
+  hueBase = 195 + Math.random() * 120;
+  newMover();
+}
+
+function newMover() {
+  const top = stack[stack.length - 1];
+  const speed = Math.min(SPEED0 + score * SPEED_GAIN, SPEED_MAX);
+  mover = {
+    w: top.w, x: -top.w, dir: 1,
+    speed,
+    y: stack.length, // row index
+    wobble: Math.random() * 6, // per-block speed wobble seed
+  };
+  if (Math.random() < 0.5) { mover.x = W; mover.dir = -1; }
+}
+
+// ---------- Input ----------
+function press(e) {
+  if (e && e.type === 'keydown' && e.code !== 'Space') return;
+  if (e) e.preventDefault();
+  if (state === S.PLAY && flipT <= 0) drop();
+}
+canvas.addEventListener('pointerdown', press);
+window.addEventListener('keydown', press);
+
+// ---------- Core mechanic ----------
+function drop() {
+  const top = stack[stack.length - 1];
+  const left = Math.max(mover.x, top.x);
+  const right = Math.min(mover.x + mover.w, top.x + top.w);
+  let overlap = right - left;
+
+  if (overlap <= 0) return die();
+
+  const offset = Math.abs((mover.x + mover.w / 2) - (top.x + top.w / 2));
+  const perfect = offset <= PERFECT_PX;
+
+  if (perfect) {
+    combo++;
+    overlap = mover.w; // snap: keep full width
+    let nx = top.x + (top.w - mover.w) / 2;
+    if (combo >= 3 && mover.w < baseWidth()) {
+      const grow = Math.min(REGROW, baseWidth() - mover.w);
+      overlap += grow; nx -= grow / 2;
+    }
+    stack.push({ x: nx, w: overlap });
+    burst(nx + overlap / 2, rowY(stack.length - 1), 26, 50);
+    showCombo(combo);
+    shake = 6;
+  } else {
+    combo = 0;
+    // shed the cut piece as debris
+    if (mover.x < top.x) debris.push(chip(mover.x, top.x - mover.x));
+    else debris.push(chip(right, (mover.x + mover.w) - right));
+    stack.push({ x: left, w: overlap });
+    burst(left + overlap / 2, rowY(stack.length - 1), 8, 25);
+  }
+
+  score++;
+  coins++;
+  localStorage.setItem('flipstack_coins', coins);
+  updateHud();
+
+  // camera chase
+  camYT = Math.max(0, (stack.length - 6) * BLOCK_H);
+
+  // world flip
+  if (score > 0 && score % FLIP_EVERY === 0) {
+    flipT = FLIP_TIME;
+    warnEl.classList.add('pulse');
+    setTimeout(() => warnEl.classList.remove('pulse'), FLIP_TIME * 1000);
+  }
+  newMover();
+}
+
+function chip(x, w) {
+  return { x, w, y: rowY(stack.length - 1), vy: -120, vr: (Math.random() - .5) * 8, r: 0 };
+}
+
+function die() {
+  state = S.DEAD;
+  sdkGameplayStop();
+  combo = 0;
+  if (score > best) { best = score; localStorage.setItem('flipstack_best', best); }
+  debris.push({ x: mover.x, w: mover.w, y: rowY(stack.length), vy: -60, vr: (Math.random() - .5) * 10, r: 0 });
+  bigScoreEl.textContent = score;
+  overSubEl.textContent = 'Best: ' + best + '   🪙 ' + coins;
+  continueBtn.style.display = usedContinue ? 'none' : '';
+  overEl.classList.remove('hidden');
+  hudEl.style.display = 'none';
+}
+
+function rowY(i) { return H - 80 - i * BLOCK_H; }
+
+// ---------- Particles ----------
+function burst(x, y, n, sp) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = sp * (0.4 + Math.random());
+    particles.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 40, life: 0.7 + Math.random() * 0.4 });
+  }
+}
+
+// ---------- HUD / UI ----------
+const menuEl = document.getElementById('menu');
+const overEl = document.getElementById('over');
+const hudEl = document.getElementById('hud');
+const hudScoreEl = document.getElementById('hudScore');
+const hudBestEl = document.getElementById('hudBest');
+const hudCoinsEl = document.getElementById('hudCoins');
+const hudFlipEl = document.getElementById('hudFlip');
+const comboEl = document.getElementById('combo');
+const warnEl = document.getElementById('flipWarn');
+const bigScoreEl = document.getElementById('bigScore');
+const overSubEl = document.getElementById('overSub');
+const continueBtn = document.getElementById('continueBtn');
+document.getElementById('menuBest').textContent = 'Best: ' + best;
+
+function updateHud() {
+  hudScoreEl.textContent = score;
+  hudBestEl.textContent = 'BEST ' + Math.max(best, score);
+  hudCoinsEl.textContent = '🪙 ' + coins;
+  const left = FLIP_EVERY - (score % FLIP_EVERY);
+  hudFlipEl.textContent = 'FLIP IN ' + left;
+  hudFlipEl.style.color = left <= 2 ? '#ff6ec7' : '';
+}
+let comboTimer = 0;
+function showCombo(c) {
+  comboEl.textContent = 'PERFECT ×' + c + (c >= 3 ? '  +GROW' : '');
+  comboEl.style.opacity = 1;
+  comboEl.style.transform = 'scale(1.15)';
+  clearTimeout(comboTimer);
+  comboTimer = setTimeout(() => {
+    comboEl.style.opacity = 0; comboEl.style.transform = 'scale(1)';
+  }, 800);
+}
+
+function startGame() {
+  reset();
+  state = S.PLAY;
+  menuEl.classList.add('hidden');
+  overEl.classList.add('hidden');
+  hudEl.style.display = 'flex';
+  updateHud();
+  sdkGameplayStart();
+}
+document.getElementById('playBtn').addEventListener('click', startGame);
+document.getElementById('retryBtn').addEventListener('click', startGame);
+continueBtn.addEventListener('click', () => {
+  continueBtn.disabled = true;
+  showRewardedAd(() => {
+    continueBtn.disabled = false;
+    usedContinue = true;
+    state = S.PLAY;
+    overEl.classList.add('hidden');
+    hudEl.style.display = 'flex';
+    newMover();
+    sdkGameplayStart();
+  });
+});
+
+// ---------- Render / loop ----------
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  update(dt, now / 1000);
+  render(now / 1000);
+  requestAnimationFrame(loop);
+}
+
+function update(dt, t) {
+  // camera ease
+  camY += (camYT - camY) * Math.min(1, dt * 5);
+  if (shake > 0) shake = Math.max(0, shake - dt * 30);
+
+  // flip animation
+  if (flipT > 0) {
+    flipT -= dt;
+    if (flipT <= 0) { flipped = !flipped; flipCount++; }
+  }
+  flipAnim += (((flipped ? 1 : 0) + (flipT > 0 ? (1 - flipT / FLIP_TIME) * (flipped ? -1 : 1) : 0)) - flipAnim) * Math.min(1, dt * 12);
+
+  if (state === S.PLAY) {
+    // mover slides with a wobble so speed isn't perfectly predictable
+    const wob = 1 + 0.25 * Math.sin(t * 2.2 + mover.wobble);
+    mover.x += mover.dir * mover.speed * wob * dt;
+    const m = 30;
+    if (mover.x < -m) { mover.x = -m; mover.dir = 1; }
+    if (mover.x + mover.w > W + m) { mover.x = W + m - mover.w; mover.dir = -1; }
+    // phantom flicker high up
+    phantomT += dt;
+  }
+
+  // debris
+  for (const d of debris) { d.vy += 900 * dt; d.y += d.vy * dt; d.r += d.vr * dt; }
+  debris = debris.filter(d => d.y < H + camY + 400);
+
+  // particles
+  for (const p of particles) { p.vy += 500 * dt; p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; }
+  particles = particles.filter(p => p.life > 0);
+}
+
+function sway(i, t) {
+  // higher rows sway further; placement logic ignores this (render-only lie)
+  const h = stack.length;
+  if (h < SWAY_START) return 0;
+  const amp = Math.min((h - SWAY_START) * 0.9, 26);
+  return Math.sin(t * 1.4 + swayPhase + i * 0.12) * amp * (i / h);
+}
+
+function blockColor(i) {
+  const hue = (hueBase + i * 7) % 360;
+  return `hsl(${hue}, 75%, ${58 - Math.min(i, 40) * 0.2}%)`;
+}
+
+function drawBlock(x, y, w, h, color, glow) {
+  ctx.fillStyle = color;
+  if (glow) { ctx.shadowColor = color; ctx.shadowBlur = 22; }
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 6);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255,255,255,.18)';
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, 6, 6);
+  ctx.fill();
+}
+
+function render(t) {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // background gradient shifts with altitude
+  const alt = Math.min(stack ? stack.length : 0, 60) / 60;
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, `hsl(${230 + alt * 60}, 45%, ${8 + alt * 8}%)`);
+  g.addColorStop(1, `hsl(${255 + alt * 40}, 50%, ${16 + alt * 6}%)`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // faint stars
+  ctx.fillStyle = 'rgba(255,255,255,.25)';
+  for (let i = 0; i < 40; i++) {
+    const sx = (i * 97 + 31) % W;
+    const sy = ((i * 211 + 57) % H + camY * 0.15) % H;
+    ctx.fillRect(sx, sy, 2, 2);
+  }
+
+  if (!stack) return;
+
+  ctx.save();
+  // world flip rotation around screen center
+  const a = flipAnim * Math.PI;
+  ctx.translate(W / 2, H / 2);
+  ctx.rotate(a);
+  ctx.translate(-W / 2, -H / 2);
+  // camera + shake
+  const shx = (Math.random() - .5) * shake, shy = (Math.random() - .5) * shake;
+  ctx.translate(shx, camY + shy);
+
+  // stack
+  for (let i = 0; i < stack.length; i++) {
+    const b = stack[i];
+    drawBlock(b.x + sway(i, t), rowY(i), b.w, BLOCK_H - 3, blockColor(i), false);
+  }
+
+  // debris
+  for (const d of debris) {
+    ctx.save();
+    ctx.translate(d.x + d.w / 2, d.y + BLOCK_H / 2);
+    ctx.rotate(d.r);
+    drawBlock(-d.w / 2, -BLOCK_H / 2, d.w, BLOCK_H - 3, 'rgba(200,60,80,.9)', false);
+    ctx.restore();
+  }
+
+  // mover (with phantom flicker at altitude)
+  if (state === S.PLAY) {
+    let alpha = 1;
+    if (stack.length >= PHANTOM_START) {
+      const severity = Math.min((stack.length - PHANTOM_START) / 20, 0.75);
+      const blink = (Math.sin(t * 6) + 1) / 2; // 0..1
+      alpha = blink < severity ? 0.06 : 1;
+    }
+    ctx.globalAlpha = alpha;
+    drawBlock(mover.x, rowY(stack.length), mover.w, BLOCK_H - 3, blockColor(stack.length), true);
+    ctx.globalAlpha = 1;
+    // guide line on the top block edge
+    const top = stack[stack.length - 1];
+    ctx.strokeStyle = 'rgba(255,255,255,.25)';
+    ctx.setLineDash([4, 6]);
+    ctx.beginPath();
+    ctx.moveTo(top.x, rowY(stack.length) + BLOCK_H);
+    ctx.lineTo(top.x, rowY(stack.length - 1));
+    ctx.moveTo(top.x + top.w, rowY(stack.length) + BLOCK_H);
+    ctx.lineTo(top.x + top.w, rowY(stack.length - 1));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // particles
+  for (const p of particles) {
+    ctx.globalAlpha = Math.max(p.life, 0);
+    ctx.fillStyle = '#ffd166';
+    ctx.fillRect(p.x - 2, p.y - 2, 4, 4);
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+
+  // flip warning overlay text opacity
+  warnEl.style.opacity = flipT > 0 ? 1 : (state === S.PLAY && score % FLIP_EVERY === FLIP_EVERY - 1 ? 0.5 : 0);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
